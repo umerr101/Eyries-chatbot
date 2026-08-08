@@ -18,7 +18,7 @@ const msg                      = require('./utils/messageBuilder');
  * @returns {string|string[]} - Reply message(s) to send
  */
 async function routeMessage(phone, body, media) {
-  const session = getSession(phone);
+  let session = getSession(phone);
   const text    = (body || '').trim().toUpperCase();
 
   // ── Global reset commands ─────────────────────────────────
@@ -30,6 +30,9 @@ async function routeMessage(phone, body, media) {
       return msg.mainMenu();
     }
   }
+
+  // Re-read session after any potential reset above so flow checks are accurate
+  session = getSession(phone);
 
   // ── FLOW: Main Menu ───────────────────────────────────────
   if (session.flow === 'MAIN_MENU') {

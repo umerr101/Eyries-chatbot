@@ -80,6 +80,7 @@ function createSession() {
     isPakistaniAirline: false,
     addFirstLeg: false,
     firstLegChoice: null,   // 'jeddahToMakkah' | 'jeddahToJeddahCity'
+    isHajjTerminal: false,  // true if flying via Jeddah Hajj Terminal (+90 SAR)
     agreedToRate: false,
     finalVisaRate: null,
 

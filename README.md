@@ -1,74 +1,71 @@
 # 🕌 Hajj & Umrah WhatsApp Chatbot
 
-A fully automated WhatsApp chatbot for Hajj & Umrah visa and transport services.  
-**No Twilio. No API keys. Just scan a QR code and go!**
+A fully automated WhatsApp chatbot for Hajj & Umrah visa and transport services built with `whatsapp-web.js` and Node.js.  
+**No Twilio. No paid API keys. Just scan a QR code and go!**
 
 ---
 
-## How It Works
+## 🚀 How It Works
 
 ```
-You run: node src/index.js
+You run: npm start (or node src/index.js)
       ↓
 A QR code appears in the terminal
       ↓
 Scan it with WhatsApp on your phone
       ↓
-Bot is LIVE on your number (+923125764118)!
+Bot is LIVE on your number!
 ```
 
 ---
 
-## Features
+## ✨ Features
 
 - **Visa Queries** — Long Stay (80 days) and 30-day packages (with/without transport)
-- **Pakistani airline detection** — Auto-applies +90 SAR surcharge
-- **Passport OCR** — Extracts 5 fields from passport image (Tesseract.js, runs locally)
-- **Arabic Name Translation** — Translates First & Last name to Arabic (free MyMemory API)
-- **Transport Rate Lookup** — All 9 routes × 6 vehicle types
-- **Payment Flow** — Displays bank details after passport confirmation
-- **Escalation** — Ticketing and helpline WhatsApp numbers (+923180978480) displayed when needed
+- **Pakistani Airline Surcharge Detection** — Auto-applies +90 SAR surcharge for Pakistani airlines / Hajj terminals
+- **Passport OCR** — Extracts 5 fields from passport MRZ images locally via `Tesseract.js` & `sharp`
+- **Arabic Name Translation** — Translates First & Last name to Arabic via free MyMemory API
+- **Transport Rate Lookup** — Dynamic lookup across 9 routes × 6 vehicle types
+- **SQLite Session Persistence** — Saves user state in `database.sqlite` so state survives bot restarts
+- **Payment & Escalation** — Displays bank payment details and redirects to live helpline/ticketing support when requested
 
 ---
 
-## Setup (3 Steps)
+## 🛠️ Setup & Running
 
-### Step 1 — Install Dependencies (already done ✅)
+### Step 1 — Install Dependencies
 
-```powershell
-$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')
-& "C:\Program Files\nodejs\npm.cmd" install
+```bash
+npm install
 ```
 
 ### Step 2 — Start the Bot
 
-```powershell
-$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')
-& "C:\Program Files\nodejs\node.exe" "c:\Users\khali\OneDrive\Desktop\chatbot\src\index.js"
+```bash
+npm start
 ```
 
 ### Step 3 — Scan the QR Code
 
-1. A QR code will appear in the terminal
-2. Open WhatsApp on your phone
-3. Go to **Settings → Linked Devices → Link a Device**
-4. Scan the QR code
-5. Bot is live! ✅
+1. A QR code will render directly in your terminal.
+2. Open WhatsApp on your phone → **Settings → Linked Devices → Link a Device**.
+3. Scan the QR code.
+4. Your session is authenticated! ✅
 
-> **Note:** After the first scan, your session is saved in `.wwebjs_auth/`. You won't need to scan again on restart.
+> **Note:** Your authenticated session is saved locally in `.wwebjs_auth/`. Subsequent restarts will automatically log in without re-scanning.
 
 ---
 
-## WhatsApp Numbers
+## 📱 WhatsApp Contacts
 
-| Purpose | Number |
+| Purpose | Contact Number |
 |---|---|
-| Bot runs on | +923125764118 |
+| Bot Instance | +923125764118 |
 | Helpline & Ticketing | +923180978480 |
 
 ---
 
-## Conversation Flow
+## 🔄 Conversation Flow
 
 ```
 Hi / Hello / Menu
@@ -92,44 +89,42 @@ Hi / Hello / Menu
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 chatbot/
 ├── src/
-│   ├── index.js              # WhatsApp client + QR auth
-│   ├── router.js             # Message router
-│   ├── stateManager.js       # Per-user conversation state
-│   ├── config.js             # Rates, routes, contacts, payment
+│   ├── index.js              # Main entry point & WhatsApp client initialization
+│   ├── router.js             # Incoming message routing logic
+│   ├── db.js                 # SQLite database setup (database.sqlite)
+│   ├── stateManager.js       # SQLite-backed per-user conversation state
+│   ├── config.js             # Rates, routes, contact details, and bank info
 │   ├── flows/
-│   │   ├── visaFlow.js       # Visa conversation flow
-│   │   └── transportFlow.js  # Transport rate lookup
+│   │   ├── visaFlow.js       # Visa interactive conversation engine
+│   │   └── transportFlow.js  # Transport rate calculator
 │   ├── ocr/
-│   │   └── passport.js       # Tesseract.js OCR
+│   │   └── passport.js       # Tesseract.js MRZ parser + Sharp pre-processor
 │   ├── translation/
-│   │   └── arabic.js         # Arabic name translation
+│   │   └── arabic.js         # Arabic name translation engine
 │   └── utils/
-│       └── messageBuilder.js # WhatsApp message templates
-├── .wwebjs_auth/             # Saved WhatsApp session (auto-created)
-├── .env                      # Business config
-└── README.md
+│       └── messageBuilder.js # Reusable WhatsApp message templates
+├── .wwebjs_auth/             # WhatsApp Web session credentials (git-ignored)
+├── database.sqlite           # Persistent user session storage (git-ignored)
+├── .env                      # Environment variables
+└── README.md                 # Project documentation
 ```
 
 ---
 
-## Notes
+## 📌 Usage Notes
 
-- Type **MENU** at any time to restart the conversation
-- Sessions expire after **30 minutes** of inactivity
-- The bot only responds to **individual chats**, not groups
-- OCR works best with **clear, well-lit, flat passport images**
-- Arabic translation uses **MyMemory API** (free, 1000 requests/day)
+- Type **MENU** at any time to reset your state and return to the main menu.
+- Sessions automatically expire after **30 minutes** of inactivity.
+- The bot responds to **individual chats** only (group messages are filtered).
+- OCR works best with clear, un-cropped, well-lit passport images.
 
 ---
 
-## Going Live (Production)
+## 🌐 Repository
 
-When ready for production, simply:
-1. Run the bot on any always-on PC or cheap VPS (e.g. DigitalOcean $4/month)
-2. Keep the process alive with `pm2` (`npm install -g pm2` → `pm2 start src/index.js`)
-3. For a **dedicated business number**, register a WhatsApp Business account on a separate SIM
+GitHub Repository: [https://github.com/umerr101/Eyries-chatbot](https://github.com/umerr101/Eyries-chatbot)

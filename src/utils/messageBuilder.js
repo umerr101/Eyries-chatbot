@@ -88,7 +88,20 @@ function firstLegTransportMenu(baseRate) {
     `1️⃣  Jeddah Airport → Makkah Hotel — *${baseRate + toMakkahRate} SAR total*\n` +
     `2️⃣  Jeddah Airport → Jeddah City — *${baseRate + toJeddahCityRate} SAR total*\n` +
     `3️⃣  No, skip 1st leg transport\n\n` +
+    `⚠️ _Note: An additional *+90 SAR* applies if you are flying via Jeddah Hajj Terminal._\n\n` +
     `_(Reply 1, 2, or 3)_` +
+    MENU_FOOTER
+  );
+}
+
+// ── Hajj Terminal Surcharge Question ──────────────────────────
+function hajjTerminalQuestion(currentRate) {
+  return (
+    `✈️ *Jeddah Hajj Terminal Check*\n\n` +
+    `Are you flying via the *Jeddah Hajj Terminal*?\n\n` +
+    `If yes, an additional *+90 SAR* surcharge applies.\n\n` +
+    `Current rate so far: *${currentRate} SAR*\n\n` +
+    `Reply *YES* (Hajj Terminal) or *NO* (regular terminal).` +
     MENU_FOOTER
   );
 }
@@ -285,6 +298,7 @@ module.exports = {
   visaWithTransportPassengerMenu,
   visaWithoutTransportInfo,
   firstLegTransportMenu,
+  hajjTerminalQuestion,
   rateConfirmation,
   requestPassportImage,
   processingMessage,

@@ -46,33 +46,35 @@ Visa Rates: --> Long stay (80 days) = 650 Saudi riyal
 			
 		90 riyal for any Pakistani airline (640 riyal)
 
-		With first leg transport 900 Saudi riyal (Jeddah airport-Makkah hotel (900 Saudi Riyal)), (Jeddah airport-Jeddah city(820 Saudi Riyal))
+		With first leg transport (Sedan rates from rate card):
+		- Jeddah Airport → Makkah Hotel: 550 + 250 = *800 Saudi Riyal total*
+		- Jeddah Airport → Jeddah City:  550 + 180 = *730 Saudi Riyal total*
 
 
 
 
 
-| Route 						| Sedan | GMC Yukon XL | Hyundai Staria | Toyota Hiace | Toyota Coaster | Bus (47 Seats) |
+Transport Rates — 1448 H (2026-27) | WEF: 05-Aug-26
+Source: Six Sigma Travel Group Official Rate Card
 
-| 
-
-| JED–MAK–MED–MAK–JED                                   |  1435 |         2420 |           1755 |         1870 |           2700 |           3600 |
-
-| Jeddah to Makkah                                      |   260 |          410 |            325 |          375 |            550 |            800 |
-
-| Makkah to Madinah / Madinah to Makkah                 |   490 |          830 |            580 |          600 |            850 |           1050 |
-
-| Jeddah Airport to Madinah / Madinah to Jeddah Airport |   520 |          870 |            600 |          650 |            900 |           1150 |
-
-| Makkah to Jeddah                                      |   195 |          350 |            270 |          295 |            450 |            700 |
-
+| Route                                                  | Sedan | GMC Yukon XL | Hyundai Staria | Toyota Hiace | Toyota Coaster | Bus (47 Seats) |
+|--------------------------------------------------------|-------|--------------|----------------|--------------|----------------|----------------|
+| JED-MAK-MED-MAK-JED (Full Package)                    |  1330 |         2320 |           1500 |         1700 |           2700 |           3700 |
+| Jeddah to Makkah                                      |   250 |          390 |            280 |          330 |            550 |            800 |
+| Makkah to Madinah / Madinah to Makkah                 |   450 |          800 |            500 |          550 |            850 |           1100 |
+| Jeddah Airport to Madinah / Madinah to Jeddah Airport |   480 |          830 |            520 |          580 |            900 |           1200 |
+| Makkah to Jeddah                                      |   180 |          330 |            220 |          270 |            450 |            700 |
 | Mazarat Makkah / Mazarat Madinah                      |   200 |          370 |            250 |          300 |            350 |            400 |
-
-| Madinah Airport ↔ Madinah Hotel                       |   150 |          260 |            220 |          275 |            300 |            450 |
-
+| Madinah Airport ↔ Madinah Hotel                       |   150 |          260 |            200 |          260 |            300 |            450 |
 | Jeddah Airport ↔ Jeddah City                          |   180 |          330 |            250 |          280 |            300 |            450 |
+| Makkah – Taif Ziarat                                  |   550 |          850 |            600 |          700 |            800 |           1000 |
 
-| Makkah – Taif Ziarat                                  |   650 |          950 |            750 |          800 |            900 |           1000 |
+Notes:
+- Additional SR 90 will be charged for Jeddah Hajj Terminal Flights.
+- Arrival intimation must be sent before 24 hours.
+- 30% will be charged in case of No Show.
+- Rates valid up to 15 Shaban 1448.
+- Rates subject to change during season without notice.
 
 
 

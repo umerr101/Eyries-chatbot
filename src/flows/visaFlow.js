@@ -100,36 +100,65 @@ async function handleVisaFlow(phone, session, incomingMsg, mediaUrl) {
   if (session.step === 'WITHOUT_TRANSPORT_FIRST_LEG') {
     if (text === '1') {
       const toMakkahRate = TRANSPORT_ROUTES.find(r => r.id === 2).rates.sedan;
-      const totalRate = session.finalVisaRate + toMakkahRate;
-      
+      const rateWithLeg  = session.finalVisaRate + toMakkahRate;
+
       updateSession(phone, {
-        step: 'WITHOUT_TRANSPORT_CONFIRM',
+        step: 'WITHOUT_TRANSPORT_HAJJ_CHECK',
         addFirstLeg: true,
         firstLegChoice: 'jeddahToMakkah',
-        finalVisaRate: totalRate,
+        finalVisaRate: rateWithLeg,
       });
-      return msg.rateConfirmation(totalRate, 'Includes Jeddah Airport → Makkah Hotel transport');
+      return msg.hajjTerminalQuestion(rateWithLeg);
     }
     if (text === '2') {
       const toJeddahCityRate = TRANSPORT_ROUTES.find(r => r.id === 8).rates.sedan;
-      const totalRate = session.finalVisaRate + toJeddahCityRate;
-      
+      const rateWithLeg      = session.finalVisaRate + toJeddahCityRate;
+
       updateSession(phone, {
-        step: 'WITHOUT_TRANSPORT_CONFIRM',
+        step: 'WITHOUT_TRANSPORT_HAJJ_CHECK',
         addFirstLeg: true,
         firstLegChoice: 'jeddahToJeddahCity',
-        finalVisaRate: totalRate,
+        finalVisaRate: rateWithLeg,
       });
-      return msg.rateConfirmation(totalRate, 'Includes Jeddah Airport → Jeddah City transport');
+      return msg.hajjTerminalQuestion(rateWithLeg);
     }
     if (text === '3') {
+      // No first leg — still ask Hajj terminal check (applies to transport in general)
       updateSession(phone, {
-        step: 'WITHOUT_TRANSPORT_CONFIRM',
+        step: 'WITHOUT_TRANSPORT_HAJJ_CHECK',
         addFirstLeg: false,
       });
-      return msg.rateConfirmation(session.finalVisaRate, `${session.airline} | No first leg transport`);
+      return msg.hajjTerminalQuestion(session.finalVisaRate);
     }
     return msg.firstLegTransportMenu(session.finalVisaRate);
+  }
+
+  // ── STEP: Hajj Terminal Surcharge Check ────────────────────
+  if (session.step === 'WITHOUT_TRANSPORT_HAJJ_CHECK') {
+    const HAJJ_SURCHARGE = 90;
+    if (text === 'YES') {
+      const finalRate = session.finalVisaRate + HAJJ_SURCHARGE;
+      updateSession(phone, {
+        step: 'WITHOUT_TRANSPORT_CONFIRM',
+        isHajjTerminal: true,
+        finalVisaRate: finalRate,
+      });
+      const details = session.addFirstLeg
+        ? `${session.firstLegChoice === 'jeddahToMakkah' ? 'Jeddah Airport → Makkah' : 'Jeddah Airport → Jeddah City'} | Hajj Terminal (+90 SAR)`
+        : `${session.airline} | Hajj Terminal surcharge (+90 SAR)`;
+      return msg.rateConfirmation(finalRate, details);
+    }
+    if (text === 'NO') {
+      updateSession(phone, {
+        step: 'WITHOUT_TRANSPORT_CONFIRM',
+        isHajjTerminal: false,
+      });
+      const details = session.addFirstLeg
+        ? `${session.firstLegChoice === 'jeddahToMakkah' ? 'Jeddah Airport → Makkah Hotel' : 'Jeddah Airport → Jeddah City'} | Regular terminal`
+        : `${session.airline} | No first leg transport`;
+      return msg.rateConfirmation(session.finalVisaRate, details);
+    }
+    return msg.hajjTerminalQuestion(session.finalVisaRate);
   }
 
   // ── STEP: Visa without Transport — Confirm rate ───────────
