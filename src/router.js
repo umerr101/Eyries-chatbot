@@ -7,7 +7,6 @@ const { getSession, updateSession, resetSession } = require('./stateManager');
 const { handleVisaFlow }       = require('./flows/visaFlow');
 const { handleTransportFlow }  = require('./flows/transportFlow');
 const { extractPassportData }  = require('./ocr/passport');
-const { translateNames }       = require('./translation/arabic');
 const msg                      = require('./utils/messageBuilder');
 
 /**
@@ -58,7 +57,7 @@ async function routeMessage(phone, body, media) {
     const result = await handleVisaFlow(phone, session, body, media);
 
     // OCR_TRIGGER: need to run OCR and send multiple messages
-    if (result && typeof result === 'object' && result.type === 'OCR_TRIGGER') {
+    if (result && typeof result === 'object' && !Array.isArray(result) && result.type === 'OCR_TRIGGER') {
       return ocrAndBuildReplies(phone, result.media);
     }
 
@@ -76,15 +75,25 @@ async function routeMessage(phone, body, media) {
 }
 
 /**
- * Runs OCR on the passport media, translates names,
+ * Runs Gemini Vision OCR on the passport media, stages pending record in SQLite,
  * and returns an array of messages to send sequentially.
  */
 async function ocrAndBuildReplies(phone, mediaData) {
   const replies = [msg.processingMessage()];
+  const session = getSession(phone);
+  const currIndex = session.currentPassengerIndex || 1;
+  const totalCount = session.passengerCount || 1;
 
   try {
-    // Save image to temp file and run OCR
+    // Run Gemini OCR via pythonBridge
     const data = await extractPassportData(mediaData);
+
+    // If 6-month validity check failed
+    if (data && data.isValidityError) {
+      updateSession(phone, { step: 'AWAIT_PASSPORT' });
+      replies.push(data.errorMessage);
+      return replies;
+    }
 
     // Check if enough data was extracted
     const detected = [data.firstName, data.lastName, data.passportNumber, data.expiryDate]
@@ -96,18 +105,15 @@ async function ocrAndBuildReplies(phone, mediaData) {
       return replies;
     }
 
-    // Translate names to Arabic
-    const { firstNameAr, lastNameAr } = await translateNames(data.firstName, data.lastName);
-
     // Save to session and move to confirmation step
     updateSession(phone, {
       step: 'PASSPORT_CONFIRM',
       passportData: data,
     });
 
-    replies.push(msg.passportConfirmationMessage(data, firstNameAr, lastNameAr));
+    replies.push(msg.passportConfirmationMessage(data, currIndex, totalCount));
   } catch (err) {
-    console.error('[OCR] Error:', err.message);
+    console.error('[OCR] Gemini OCR Error:', err.message);
     updateSession(phone, { step: 'AWAIT_PASSPORT' });
     replies.push(msg.ocrFailedMessage());
   }
