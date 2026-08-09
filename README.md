@@ -92,25 +92,26 @@ Hi / Hello / Menu
 ## 📁 Project Structure
 
 ```
-chatbot/
+Eyries-chatbot/
+├── passport_ocr_master.py   # Gemini 2.0 Flash OCR, SQLite staging, Arabic translation & Excel exporter
+├── passports.db              # SQLite database for pending & confirmed passport records
+├── Master_Passports.xlsx     # Styled Master Excel spreadsheet with Arabic names
+├── sessions.json             # Persistent WhatsApp user conversation states
 ├── src/
-│   ├── index.js              # Main entry point & WhatsApp client initialization
-│   ├── router.js             # Incoming message routing logic
-│   ├── db.js                 # SQLite database setup (database.sqlite)
-│   ├── stateManager.js       # SQLite-backed per-user conversation state
-│   ├── config.js             # Rates, routes, contact details, and bank info
+│   ├── index.js              # Entry point: WhatsApp client initialization & high-res QR generator
+│   ├── router.js             # Incoming message router
+│   ├── db.js                 # Session storage manager
+│   ├── stateManager.js       # Per-user conversation state manager
+│   ├── config.js             # Visa rates, transport rate card, bank info
 │   ├── flows/
 │   │   ├── visaFlow.js       # Visa interactive conversation engine
 │   │   └── transportFlow.js  # Transport rate calculator
 │   ├── ocr/
-│   │   └── passport.js       # Tesseract.js MRZ parser + Sharp pre-processor
-│   ├── translation/
-│   │   └── arabic.js         # Arabic name translation engine
+│   │   ├── passport.js       # Passport OCR interface calling pythonBridge
+│   │   └── pythonBridge.js   # Asynchronous bridge executing passport_ocr_master.py
 │   └── utils/
-│       └── messageBuilder.js # Reusable WhatsApp message templates
-├── .wwebjs_auth/             # WhatsApp Web session credentials (git-ignored)
-├── database.sqlite           # Persistent user session storage (git-ignored)
-├── .env                      # Environment variables
+│       └── messageBuilder.js # Formatted WhatsApp message templates
+├── .env                      # API keys and environment variables
 └── README.md                 # Project documentation
 ```
 

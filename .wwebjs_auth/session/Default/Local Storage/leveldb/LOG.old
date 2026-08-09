@@ -1,6 +1,0 @@
-2026/08/08-23:08:59.698 5e70 Reusing MANIFEST c:\Users\khali\OneDrive\Desktop\chatbot\.wwebjs_auth\session\Default\Local Storage\leveldb/MANIFEST-000001
-2026/08/08-23:08:59.719 5e70 Recovering log #8
-2026/08/08-23:08:59.734 5e70 Reusing old log c:\Users\khali\OneDrive\Desktop\chatbot\.wwebjs_auth\session\Default\Local Storage\leveldb/000008.log 
-2026/08/08-23:09:59.767 1748 Level-0 table #11: started
-2026/08/08-23:09:59.795 1748 Level-0 table #11: 15159 bytes OK
-2026/08/08-23:09:59.801 1748 Delete type=0 #8

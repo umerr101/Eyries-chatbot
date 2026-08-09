@@ -13,14 +13,13 @@ const axios                = require('axios');
 const { routeMessage }     = require('./router');
 
 // ── Absolute path for session storage ─────────────────────────
-const SESSION_PATH = path.resolve('c:\\Users\\khali\\OneDrive\\Desktop\\chatbot\\.wwebjs_auth');
+const SESSION_PATH = path.resolve('.wwebjs_auth');
 
 // ── Locate installed Chrome ────────────────────────────────────
-const CHROME_PATH = path.join(
-  process.env.USERPROFILE || 'C:\\Users\\khali',
-  '.cache', 'puppeteer', 'chrome', 'win64-146.0.7680.31',
-  'chrome-win64', 'chrome.exe'
-);
+const CHROME_PATH = process.env.CHROME_PATH ||
+  (require('fs').existsSync('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe')
+    ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+    : 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe');
 
 // ── Create WhatsApp client ─────────────────────────────────────
 const client = new Client({
@@ -28,27 +27,42 @@ const client = new Client({
   puppeteer: {
     headless: true,
     executablePath: CHROME_PATH,
+    bypassCSP: true,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-accelerated-2d-canvas',
       '--no-first-run',
+      '--no-zygote',
       '--disable-gpu',
-      '--disable-extensions',
-      '--disable-software-rasterizer',
-      '--disable-background-timer-throttling',
-      '--disable-backgrounding-occluded-windows',
-      '--disable-renderer-backgrounding',
     ],
   },
+  webVersionCache: {
+    type: 'remote',
+    remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+  }
 });
+
+const QRCodeImage          = require('qrcode');
 
 // ── QR Code ────────────────────────────────────────────────────
 client.on('qr', (qr) => {
-  console.log('\n📱 Scan this QR code with WhatsApp on your phone:\n');
+  console.log('\n============================================================');
+  console.log('📱 SCAN THIS QR CODE WITH WHATSAPP ON YOUR PHONE');
+  console.log('============================================================\n');
   qrcode.generate(qr, { small: true });
-  console.log('\n⚠️  Open WhatsApp → ⋮ Menu → Linked Devices → Link a Device → Scan\n');
+  console.log('\nRaw QR Code Data String:\n' + qr + '\n');
+
+  // Save crisp PNG image to root directory for instant scanning
+  const qrImagePath = path.join(__dirname, '..', 'qr.png');
+  QRCodeImage.toFile(qrImagePath, qr, { width: 400, margin: 2 }, (err) => {
+    if (!err) {
+      console.log(`✅ Saved high-res QR image: ${qrImagePath}`);
+    }
+  });
+
+  console.log('⚠️ Open WhatsApp → ⋮ Menu → Linked Devices → Link a Device → Scan\n');
 });
 
 // ── Authenticated ──────────────────────────────────────────────
@@ -372,4 +386,10 @@ function decryptWhatsAppMedia(encryptedBuffer, mediaKeyBase64, mediaType) {
 // ── Start ──────────────────────────────────────────────────────
 console.log('\n🕌 Hajj & Umrah WhatsApp Chatbot');
 console.log('   Starting up — please wait...\n');
-client.initialize();
+client.initialize().catch(err => {
+  if (err.message.includes('Execution context was destroyed')) {
+    console.log('ℹ️  WhatsApp Web page navigating... connection initializing.');
+  } else {
+    console.error('❌  Initialization error:', err.message);
+  }
+});

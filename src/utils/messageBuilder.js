@@ -118,9 +118,13 @@ function rateConfirmation(rate, details = '') {
 }
 
 // ── Request Passport Image ─────────────────────────────────────
-function requestPassportImage() {
+function requestPassportImage(currentIndex = 1, totalCount = 1) {
+  const headerText = totalCount > 1
+    ? `📸 *Please send a photo for Passport ${currentIndex} of ${totalCount}.*`
+    : `📸 *Please send a photo of your passport.*`;
+
   return (
-    `📸 *Please send a photo of your passport.*\n\n` +
+    `${headerText}\n\n` +
     `*How to send:*\n` +
     `1️⃣ Open this chat\n` +
     `2️⃣ Tap the 📎 *paperclip* icon\n` +
@@ -137,24 +141,38 @@ function requestPassportImage() {
   );
 }
 
+// ── Passenger Count Prompt ─────────────────────────────────────
+function passengerCountPrompt(visaLabel = 'Visa Package') {
+  return (
+    `👥 *Passenger Quantity — Eyries*\n\n` +
+    `You have selected: *${visaLabel}*\n\n` +
+    `Please enter the total number of passengers / visas you require (e.g. *1*, *2*, *3*, etc.):` +
+    MENU_FOOTER
+  );
+}
+
 // ── OCR Processing Message ─────────────────────────────────────
 function processingMessage() {
   return `⏳ _Processing your passport image... please wait a moment._`;
 }
 
 // ── Passport Details Confirmation ──────────────────────────────
-function passportConfirmationMessage(data, firstNameAr, lastNameAr) {
+function passportConfirmationMessage(data, currentIndex = 1, totalCount = 1) {
+  const headerText = totalCount > 1
+    ? `📄 *Passport Data Extracted (Passport ${currentIndex} of ${totalCount}) — Eyries*`
+    : `📄 *Passport Data Extracted — Eyries*`;
+
   return (
-    `✅ *Passport Details Extracted — Eyries*\n\n` +
-    `👤 *First Name:*      ${data.firstName}\n` +
-    `   _(Arabic)_ الاسم الأول: *${firstNameAr}*\n\n` +
-    `👤 *Last Name:*       ${data.lastName}\n` +
-    `   _(Arabic)_ اسم العائلة: *${lastNameAr}*\n\n` +
-    `🛂 *Passport No:*     ${data.passportNumber}\n` +
-    `📅 *Issue Date:*      ${data.issueDate}\n` +
-    `📅 *Expiry Date:*     ${data.expiryDate}\n\n` +
-    `Are these details *correct*?\n` +
-    `Reply *YES* to confirm or *NO* to resend your passport image.` +
+    `${headerText}\n\n` +
+    `👤 *First Name:*    ${data.firstName}\n` +
+    `👤 *Last Name:*     ${data.lastName}\n` +
+    `🛂 *Passport No:*   ${data.passportNumber}\n` +
+    `🌍 *Nationality:*   ${data.nationality || 'N/A'}\n` +
+    `📅 *DOB:*           ${data.dob || 'N/A'}\n` +
+    `📅 *Issue Date:*    ${data.issueDate || 'N/A'}\n` +
+    `📅 *Expiry Date:*   ${data.expiryDate}\n\n` +
+    `👉 Reply *YES* to Confirm Details\n` +
+    `👉 Reply *NO* to Reject & Retry` +
     MENU_FOOTER
   );
 }
@@ -301,6 +319,7 @@ module.exports = {
   hajjTerminalQuestion,
   rateConfirmation,
   requestPassportImage,
+  passengerCountPrompt,
   processingMessage,
   passportConfirmationMessage,
   paymentDetails,

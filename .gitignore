@@ -5,3 +5,8 @@ node_modules/
 .wwebjs_cache/
 test_auth/
 *.sqlite
+__pycache__/
+qr.png
+passports.db
+sessions.json
+Master_Passports.xlsx
