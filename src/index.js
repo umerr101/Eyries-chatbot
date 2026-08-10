@@ -11,6 +11,7 @@ const path                 = require('path');
 const crypto               = require('crypto');
 const axios                = require('axios');
 const { routeMessage }     = require('./router');
+const { getSession }       = require('./stateManager');
 
 // ── Absolute path for session storage ─────────────────────────
 const SESSION_PATH = path.resolve('.wwebjs_auth');
