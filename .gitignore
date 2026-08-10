@@ -9,4 +9,5 @@ __pycache__/
 qr.png
 passports.db
 sessions.json
-Master_Passports.xlsx
+eng.traineddata
+.wwebjs_auth_old/
