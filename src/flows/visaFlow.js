@@ -43,12 +43,33 @@ async function handleVisaFlow(phone, session, incomingMsg, mediaUrl) {
     const passengers = VISA_RATES.withTransport.passengers;
     if (choice >= 1 && choice <= passengers.length) {
       const selected = passengers[choice - 1];
+
+      // Option 1 (5-47 passengers): Ask user for exact number of passengers
+      if (choice === 1) {
+        updateSession(phone, {
+          step: 'ASK_PASSENGERS',
+          perPersonRate: selected.rate,
+          visaLabel: `Visa WITH Transport (${selected.range})`
+        });
+        return msg.passengerCountPrompt(`Visa WITH Transport (${selected.range}) — ${selected.rate} SAR/person`);
+      }
+
+      // Options 2-5 (4, 3, 2, or 1 passenger): Number of passengers is fixed by selection
+      const exactCountMap = { 2: 4, 3: 3, 4: 2, 5: 1 };
+      const count = exactCountMap[choice];
+      const totalRate = selected.rate * count;
+
       updateSession(phone, {
-        step: 'ASK_PASSENGERS',
+        step: 'AWAIT_PASSPORT',
+        passengerCount: count,
+        currentPassengerIndex: 1,
         perPersonRate: selected.rate,
+        finalVisaRate: totalRate,
+        agreedToRate: true,
         visaLabel: `Visa WITH Transport (${selected.range})`
       });
-      return msg.passengerCountPrompt(`Visa WITH Transport (${selected.range}) — ${selected.rate} SAR/person`);
+
+      return msg.requestPassportImage(1, count);
     }
     return msg.visaWithTransportPassengerMenu();
   }
@@ -196,11 +217,23 @@ async function handleVisaFlow(phone, session, incomingMsg, mediaUrl) {
         console.error('[VisaFlow] Gemini Confirmation error:', err.message);
       }
 
+      // Record scanned passport number and image hash into session lists
+      const currentScanned = session.scannedPassportNumbers || [];
+      const currentHashes = session.uploadedImageHashes || [];
+      if (session.passportData?.passportNumber) {
+        currentScanned.push(session.passportData.passportNumber.toUpperCase());
+      }
+      if (session.pendingImageHash) {
+        currentHashes.push(session.pendingImageHash);
+      }
+
       if (currIndex < totalCount) {
         const nextIndex = currIndex + 1;
         updateSession(phone, {
           step: 'AWAIT_PASSPORT',
           currentPassengerIndex: nextIndex,
+          scannedPassportNumbers: currentScanned,
+          uploadedImageHashes: currentHashes,
         });
 
         const progressMsg = `✅ *Passport ${currIndex} of ${totalCount} Confirmed & Recorded!*`;
@@ -208,8 +241,13 @@ async function handleVisaFlow(phone, session, incomingMsg, mediaUrl) {
         return [progressMsg, nextPrompt];
       } else {
         // All passengers confirmed!
-        updateSession(phone, { step: 'PAYMENT', passportConfirmed: true });
-        const allDoneMsg = `✅ *Passport ${currIndex} of ${totalCount} Confirmed & Recorded!*\n\n🎉 *All ${totalCount} passport(s) have been verified and processed!*`;
+        updateSession(phone, {
+          step: 'PAYMENT',
+          passportConfirmed: true,
+          scannedPassportNumbers: currentScanned,
+          uploadedImageHashes: currentHashes,
+        });
+        const allDoneMsg = `✅ *Passport ${currIndex} of ${totalCount} Confirmed & Recorded!*\n\n🎉 *All ${totalCount} passport(s) have been verified and sent forward!*`;
         const paymentMsg = msg.paymentDetails(session.finalVisaRate);
         return [allDoneMsg, paymentMsg];
       }

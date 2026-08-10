@@ -119,24 +119,10 @@ function rateConfirmation(rate, details = '') {
 
 // ── Request Passport Image ─────────────────────────────────────
 function requestPassportImage(currentIndex = 1, totalCount = 1) {
-  const headerText = totalCount > 1
-    ? `📸 *Please send a photo for Passport ${currentIndex} of ${totalCount}.*`
-    : `📸 *Please send a photo of your passport.*`;
-
+  const countText = totalCount > 1 ? ` (Passport ${currentIndex} of ${totalCount})` : '';
   return (
-    `${headerText}\n\n` +
-    `*How to send:*\n` +
-    `1️⃣ Open this chat\n` +
-    `2️⃣ Tap the 📎 *paperclip* icon\n` +
-    `3️⃣ Tap *Gallery* or *Camera*\n` +
-    `4️⃣ Select or take a photo of the passport data page\n` +
-    `5️⃣ Tap Send ✅\n\n` +
-    `⚠️ *Do NOT send it as a Document — use Gallery or Camera only.*\n\n` +
-    `Make sure the photo shows:\n` +
-    `   • Full name\n` +
-    `   • Passport number\n` +
-    `   • Issue & expiry dates\n` +
-    `   • The two lines of small text at the bottom (MRZ)` +
+    `📸 *Please send a photo of your passport${countText}*\n\n` +
+    `Ensure the data page is clear, flat, and un-cropped.` +
     MENU_FOOTER
   );
 }

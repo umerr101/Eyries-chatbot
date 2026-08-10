@@ -324,6 +324,17 @@ client.on('message', async (message) => {
       }
     }
 
+    // Send instant status message if passport image was received
+    const currentSession = getSession(from);
+    if (mediaData && currentSession?.step === 'AWAIT_PASSPORT') {
+      try {
+        console.log('   Sending instant status update...');
+        await client.sendMessage(from, '⏳ _Processing your passport image... please wait a moment._');
+      } catch (err) {
+        console.warn('   Could not send instant status update:', err.message);
+      }
+    }
+
     // Route through conversation engine
     const replies = await routeMessage(from, body, mediaData);
     console.log(`   Sending reply...`);

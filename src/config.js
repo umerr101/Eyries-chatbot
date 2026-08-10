@@ -13,10 +13,10 @@ const CONTACTS = {
 // ─── Payment Details ─────────────────────────────────────────
 const PAYMENT = {
   bankName:      process.env.BANK_NAME       || 'Meezan Bank Ltd',
-  accountTitle:  process.env.ACCOUNT_TITLE   || 'Al-Noor Hajj & Umrah Services',
+  accountTitle:  process.env.ACCOUNT_TITLE   || 'Eyries Holidays',
   accountNumber: process.env.ACCOUNT_NUMBER  || '0123456789012345',
   iban:          process.env.IBAN            || 'PK36MEZN0001230123456789',
-  branch:        process.env.BANK_BRANCH     || 'Main Branch, Karachi',
+  branch:        process.env.BANK_BRANCH     || 'Head Office, Islamabad',
 };
 
 // ─── Pakistani Airlines (attract +90 SAR surcharge) ──────────

@@ -3,6 +3,7 @@
 //  Returns reply strings directly (no Twilio client needed)
 // ============================================================
 
+const crypto                     = require('crypto');
 const { getSession, updateSession, resetSession } = require('./stateManager');
 const { handleVisaFlow }       = require('./flows/visaFlow');
 const { handleTransportFlow }  = require('./flows/transportFlow');
@@ -76,13 +77,25 @@ async function routeMessage(phone, body, media) {
 
 /**
  * Runs Gemini Vision OCR on the passport media, stages pending record in SQLite,
- * and returns an array of messages to send sequentially.
+ * and returns the response message to send.
  */
 async function ocrAndBuildReplies(phone, mediaData) {
-  const replies = [msg.processingMessage()];
   const session = getSession(phone);
   const currIndex = session.currentPassengerIndex || 1;
   const totalCount = session.passengerCount || 1;
+
+  // ── Duplicate Image Check ──────────────────────────────────────
+  const imageHash = crypto.createHash('md5').update(mediaData?.data || '').digest('hex');
+  const uploadedHashes = session.uploadedImageHashes || [];
+
+  if (uploadedHashes.includes(imageHash)) {
+    updateSession(phone, { step: 'AWAIT_PASSPORT' });
+    return (
+      `⚠️ *You have already uploaded this passport picture.*\n\n` +
+      `Please send a photo of the next passenger's passport (Passport ${currIndex} of ${totalCount}).` +
+      msg.mainMenuFooter()
+    );
+  }
 
   try {
     // Run Gemini OCR via pythonBridge
@@ -91,8 +104,7 @@ async function ocrAndBuildReplies(phone, mediaData) {
     // If 6-month validity check failed
     if (data && data.isValidityError) {
       updateSession(phone, { step: 'AWAIT_PASSPORT' });
-      replies.push(data.errorMessage);
-      return replies;
+      return data.errorMessage;
     }
 
     // Check if enough data was extracted
@@ -101,24 +113,35 @@ async function ocrAndBuildReplies(phone, mediaData) {
 
     if (detected < 2) {
       updateSession(phone, { step: 'AWAIT_PASSPORT' });
-      replies.push(msg.ocrFailedMessage());
-      return replies;
+      return msg.ocrFailedMessage();
     }
 
-    // Save to session and move to confirmation step
+    // ── Duplicate Passport Number Check ────────────────────────────
+    const scannedPassports = session.scannedPassportNumbers || [];
+    const passportNo = (data.passportNumber || '').toUpperCase();
+
+    if (passportNo && scannedPassports.includes(passportNo)) {
+      updateSession(phone, { step: 'AWAIT_PASSPORT' });
+      return (
+        `⚠️ *Passport number (${passportNo}) has already been uploaded for another passenger in this request.*\n\n` +
+        `Please send a photo of the next passenger's passport (Passport ${currIndex} of ${totalCount}).` +
+        msg.mainMenuFooter()
+      );
+    }
+
+    // Save imageHash to pending session state
     updateSession(phone, {
       step: 'PASSPORT_CONFIRM',
       passportData: data,
+      pendingImageHash: imageHash,
     });
 
-    replies.push(msg.passportConfirmationMessage(data, currIndex, totalCount));
+    return msg.passportConfirmationMessage(data, currIndex, totalCount);
   } catch (err) {
     console.error('[OCR] Gemini OCR Error:', err.message);
     updateSession(phone, { step: 'AWAIT_PASSPORT' });
-    replies.push(msg.ocrFailedMessage());
+    return msg.ocrFailedMessage();
   }
-
-  return replies;
 }
 
 module.exports = { routeMessage };
