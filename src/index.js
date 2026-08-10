@@ -114,13 +114,34 @@ client.on('message', async (message) => {
     // Skip status broadcasts
     if (message.from === 'status@broadcast') return;
 
-    // Skip messages sent BY the bot itself
+    // Skip background system notifications (e2e_notification, protocol, ciphertext, etc.)
+    const SYSTEM_TYPES = [
+      'e2e_notification',
+      'notification_template',
+      'protocol',
+      'gp2',
+      'broadcast_notification',
+      'ciphertext',
+      'revoked',
+      'pinned_message',
+      'reaction',
+    ];
+    if (SYSTEM_TYPES.includes(message.type)) return;
+
+    // Only process standard user interaction message types
+    const ALLOWED_TYPES = ['chat', 'image', 'document', 'audio', 'voice', 'video', 'location', 'vcard', 'ptt'];
+    if (!ALLOWED_TYPES.includes(message.type)) return;
+
+    // Skip messages sent BY the bot itself (unless explicitly testing)
     if (message.fromMe) return;
 
     const from     = message.from;
-    const body     = message.body || '';
+    const body     = (message.body || '').trim();
     const hasMedia = message.hasMedia;
     const msgType  = message.type; // 'chat', 'image', 'document', etc.
+
+    // Skip empty body messages with no media attached
+    if (!hasMedia && !body) return;
 
     console.log(`\n📨 [${new Date().toLocaleTimeString()}] From: ${from}`);
     console.log(`   Type: ${msgType} | Body: "${body}"${hasMedia ? ' [+media]' : ''}`);
