@@ -28,7 +28,7 @@ if hasattr(sys.stdout, 'reconfigure'):
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 from pydantic import BaseModel, Field
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageOps
 import pandas as pd
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -224,18 +224,32 @@ def export_confirmed_passports_to_excel() -> str:
 # ==============================================================================
 # OCR & TRANSLATION ENGINE
 # ==============================================================================
-def compress_image_if_needed(image_bytes: bytes, max_dim: int = 1200) -> tuple[bytes, str]:
-    """Resizes photos for fast processing and optimal token cost."""
+def preprocess_passport_image(image_bytes: bytes, max_dim: int = 2048, enhance: bool = False) -> tuple[bytes, str]:
+    """Auto-rotates EXIF orientation (fixing sideways phone photos), enhances contrast/sharpness for blurry photos, and resizes."""
     try:
         img = Image.open(io.BytesIO(image_bytes))
+        
+        # 1. Auto-rotate based on EXIF camera orientation (fixes rotated/sideways phone uploads)
+        img = ImageOps.exif_transpose(img)
+        
         if img.mode != 'RGB':
             img = img.convert('RGB')
+
+        # 2. Enhance contrast and sharpness if photo is blurry or low-light
+        if enhance:
+            enhancer = ImageEnhance.Contrast(img)
+            img = enhancer.enhance(1.4)
+            sharpener = ImageEnhance.Sharpness(img)
+            img = sharpener.enhance(2.0)
+
+        # 3. Preserve high resolution up to 2048px for sharp MRZ text reading
         width, height = img.size
         if width > max_dim or height > max_dim:
             ratio = max_dim / float(max(width, height))
             img = img.resize((int(width * ratio), int(height * ratio)), Image.Resampling.LANCZOS)
+
         buf = io.BytesIO()
-        img.save(buf, format='JPEG', quality=85)
+        img.save(buf, format='JPEG', quality=95)
         return buf.getvalue(), "image/jpeg"
     except Exception:
         return image_bytes, "image/jpeg"
@@ -291,52 +305,58 @@ def apply_father_name_rule(data: Dict[str, Any]) -> Dict[str, Any]:
     return data
 
 def run_passport_ocr(image_bytes: bytes, api_key: Optional[str] = None) -> Dict[str, Any]:
-    """Performs Gemini 2.0 Vision OCR on passport photo bytes."""
+    """Performs Gemini 2.0 Vision OCR on passport photo bytes with multi-pass image enhancement."""
     key = api_key or GEMINI_API_KEY
     try:
         from google import genai
         from google.genai import types
-        compressed_bytes, mime_type = compress_image_if_needed(image_bytes)
+
         client = genai.Client(api_key=key)
 
         prompt = """
-        Extract all passport data accurately from this document photo.
-        Carefully read all visual text fields on the passport page:
+        Extract all passport data accurately from this document photo, even if the photo is slightly blurry, angled, rotated, or low-light.
+        If the passport is rotated or sideways, orient and read text in the correct upright direction.
+
+        Carefully read all visual text fields and cross-reference with the Machine Readable Zone (MRZ) lines at the bottom:
         - Surname / Last Name
         - Given Names / First Name
-        - Father Name (e.g. "ZAKIR, MUHAMMAD USAMA" or "NAZIR, MUHAMMAD")
-        - Passport Number
+        - Father Name (e.g. "ZAKIR, MUHAMMAD USAMA" or "NAZIR, MUHAMMAD" or "MEHMOOD, YASIR")
+        - Passport Number (check visual text e.g. JN6908893, QG4112503 and MRZ line 2)
         - Nationality
         - Date of Birth (DOB)
-        - Date of Issue (CRITICAL: Read the exact printed 'Date of Issue' / 'تاریخ اجراء' visual text field on the passport page. Do NOT guess or calculate Date of Issue from Expiry Date because passports can be valid for either 5 years or 10 years! For example '01 AUG 2026' must be extracted as '2026-08-01').
+        - Date of Issue (CRITICAL: Read the exact printed 'Date of Issue' / 'تاریخ اجراء' visual field. Do NOT calculate Date of Issue from Expiry Date!)
         - Date of Expiry
 
-        Cross-reference with Machine Readable Zone (MRZ) characters at the bottom for Surname, Given Names, Passport Number, DOB, and Expiry Date.
         Ensure all date fields (date_of_birth, date_of_issue, date_of_expiry) are strictly formatted as YYYY-MM-DD.
         """
 
         candidate_models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']
-        response = None
-        for m in candidate_models:
-            try:
-                response = client.models.generate_content(
-                    model=m,
-                    contents=[types.Part.from_bytes(data=compressed_bytes, mime_type=mime_type), prompt],
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        response_schema=PassportSchema,
-                        temperature=0.0
-                    )
-                )
-                if response and response.text:
-                    break
-            except Exception as err:
-                sys.stderr.write(f"Model {m} error: {err}\n")
-                continue
 
-        if response and response.text:
-            data = PassportSchema.model_validate_json(response.text).model_dump()
-            return apply_father_name_rule(data)
+        # Pass 1: Standard high-res EXIF auto-rotated image
+        # Pass 2: Enhanced contrast & sharpness boosted image for blurry/low-light photos
+        for enhance_pass in [False, True]:
+            compressed_bytes, mime_type = preprocess_passport_image(image_bytes, max_dim=2048, enhance=enhance_pass)
+
+            for m in candidate_models:
+                try:
+                    response = client.models.generate_content(
+                        model=m,
+                        contents=[types.Part.from_bytes(data=compressed_bytes, mime_type=mime_type), prompt],
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=PassportSchema,
+                            temperature=0.0
+                        )
+                    )
+                    if response and response.text:
+                        data = PassportSchema.model_validate_json(response.text).model_dump()
+                        # Check if valid passport number & name were extracted
+                        if data.get('passport_number') and data.get('passport_number').upper() not in ['N/A', 'NONE']:
+                            return apply_father_name_rule(data)
+                except Exception as err:
+                    sys.stderr.write(f"Model {m} (enhance={enhance_pass}) error: {err}\n")
+                    continue
+
     except Exception as e:
         sys.stderr.write(f"Gemini OCR error: {e}\n")
 
