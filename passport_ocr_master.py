@@ -19,6 +19,9 @@ import urllib.parse
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
+from dotenv import load_dotenv
+load_dotenv()
+
 # Force UTF-8 encoding for stdout and stderr on Windows
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -34,7 +37,7 @@ from openpyxl.utils import get_column_letter
 # ==============================================================================
 # CONFIGURATION & API KEY SETUP
 # ==============================================================================
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AQ.Ab8RN6JVLoVTgjeWIRlTvxsk1PkYE4axwjHA2wvrzS6HWwvTvA")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 DB_FILE = os.path.join(os.path.dirname(__file__), "passports.db")
 EXCEL_FILE = os.path.join(os.path.dirname(__file__), "Master_Passports.xlsx")
 
@@ -304,7 +307,7 @@ def run_passport_ocr(image_bytes: bytes, api_key: Optional[str] = None) -> Dict[
         Ensure date fields (date_of_birth, date_of_issue, date_of_expiry) are strictly formatted as YYYY-MM-DD.
         """
 
-        candidate_models = ['gemini-2.0-flash', 'gemini-flash-latest']
+        candidate_models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest']
         response = None
         for m in candidate_models:
             try:
@@ -329,17 +332,7 @@ def run_passport_ocr(image_bytes: bytes, api_key: Optional[str] = None) -> Dict[
     except Exception as e:
         sys.stderr.write(f"Gemini OCR error: {e}\n")
 
-    # Default fallback structure if Gemini fails
-    return apply_father_name_rule({
-        "first_name": "ABDULLAH",
-        "last_name": "N/A",
-        "father_name": "NAZIR, MUHAMMAD",
-        "passport_number": "MC1074692",
-        "nationality": "PAK",
-        "date_of_birth": "2004-08-29",
-        "date_of_issue": "2025-07-17",
-        "date_of_expiry": "2035-07-16"
-    })
+    return None
 
 def validate_passport_validity(expiry_date_str: str) -> tuple[bool, str]:
     """
@@ -450,6 +443,11 @@ def process_passport_image(image_bytes: bytes) -> Dict[str, Any]:
     4. Returns data + ready-to-send WhatsApp text message.
     """
     extracted_data = run_passport_ocr(image_bytes)
+    if not extracted_data or not isinstance(extracted_data, dict):
+        return {
+            "success": False,
+            "error": "Could not extract text from passport image. Please make sure the photo is clear, well-lit, un-cropped, and try sending again."
+        }
     
     # 6-Month Passport Validity Check
     is_valid, validity_msg = validate_passport_validity(extracted_data.get('date_of_expiry', ''))
