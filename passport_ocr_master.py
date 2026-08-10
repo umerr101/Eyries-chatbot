@@ -301,13 +301,21 @@ def run_passport_ocr(image_bytes: bytes, api_key: Optional[str] = None) -> Dict[
 
         prompt = """
         Extract all passport data accurately from this document photo.
-        Carefully read visual text fields (Surname, Given Names, Father Name, Passport Number, Nationality, DOB, Date of Issue, Expiry Date).
-        Cross-reference with Machine Readable Zone (MRZ) characters at the bottom.
-        If Father Name is present on passport, extract it into father_name (e.g. "NAZIR, MUHAMMAD" or "NAZIR MUHAMMAD").
-        Ensure date fields (date_of_birth, date_of_issue, date_of_expiry) are strictly formatted as YYYY-MM-DD.
+        Carefully read all visual text fields on the passport page:
+        - Surname / Last Name
+        - Given Names / First Name
+        - Father Name (e.g. "ZAKIR, MUHAMMAD USAMA" or "NAZIR, MUHAMMAD")
+        - Passport Number
+        - Nationality
+        - Date of Birth (DOB)
+        - Date of Issue (CRITICAL: Read the exact printed 'Date of Issue' / 'تاریخ اجراء' visual text field on the passport page. Do NOT guess or calculate Date of Issue from Expiry Date because passports can be valid for either 5 years or 10 years! For example '01 AUG 2026' must be extracted as '2026-08-01').
+        - Date of Expiry
+
+        Cross-reference with Machine Readable Zone (MRZ) characters at the bottom for Surname, Given Names, Passport Number, DOB, and Expiry Date.
+        Ensure all date fields (date_of_birth, date_of_issue, date_of_expiry) are strictly formatted as YYYY-MM-DD.
         """
 
-        candidate_models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest']
+        candidate_models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']
         response = None
         for m in candidate_models:
             try:
