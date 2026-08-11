@@ -3,7 +3,7 @@
 //  Delegates extraction to Python passport_ocr_master.py module
 // ============================================================
 
-const { processPassportWithGemini } = require('./pythonBridge');
+const { processPassportWithGemini, processTicketWithGemini } = require('./pythonBridge');
 
 /**
  * Runs Gemini Vision OCR via passport_ocr_master.py
@@ -38,4 +38,32 @@ async function extractPassportData(mediaData) {
   }
 }
 
-module.exports = { extractPassportData };
+/**
+ * Runs Gemini Vision Ticket OCR via passport_ocr_master.py
+ * @param {object} mediaData - whatsapp-web.js MessageMedia object ({ data, mimetype })
+ */
+async function extractTicketData(mediaData) {
+  try {
+    const result = await processTicketWithGemini(mediaData);
+    if (result && result.success) {
+      return {
+        isValid: true,
+        departureDate: result.departure_date,
+        formattedDate: result.formatted_date,
+        message: result.whatsapp_message
+      };
+    }
+    return {
+      isValid: false,
+      errorMessage: result?.error || result?.whatsapp_message || 'Could not read ticket booking details.'
+    };
+  } catch (err) {
+    console.error('[Ticket OCR] Error:', err.message);
+    return {
+      isValid: false,
+      errorMessage: '❌ *Could not process ticket booking image.* Please upload a clear picture of your ticket.'
+    };
+  }
+}
+
+module.exports = { extractPassportData, extractTicketData };

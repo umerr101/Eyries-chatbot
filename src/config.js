@@ -108,12 +108,12 @@ const TRANSPORT_ROUTES = [
 ];
 
 const VEHICLES = [
-  { id: 1, key: 'sedan',         label: 'Sedan' },
-  { id: 2, key: 'gmcYukon',      label: 'GMC Yukon XL' },
-  { id: 3, key: 'hyundaiStaria', label: 'Hyundai Staria' },
-  { id: 4, key: 'toyotaHiace',   label: 'Toyota Hiace' },
-  { id: 5, key: 'toyotaCoaster', label: 'Toyota Coaster' },
-  { id: 6, key: 'bus47',         label: 'Bus (47 Seats)' },
+  { id: 1, key: 'sedan',         label: 'Sedan',          capacity: '3-4 passengers' },
+  { id: 2, key: 'gmcYukon',      label: 'GMC Yukon XL',   capacity: '6 passengers' },
+  { id: 3, key: 'hyundaiStaria', label: 'Hyundai Staria', capacity: '6 passengers' },
+  { id: 4, key: 'toyotaHiace',   label: 'Toyota Hiace',   capacity: '9 passengers' },
+  { id: 5, key: 'toyotaCoaster', label: 'Toyota Coaster', capacity: '17 passengers' },
+  { id: 6, key: 'bus47',         label: 'Bus (47 Seats)', capacity: '47 passengers' },
 ];
 
 module.exports = { CONTACTS, PAYMENT, PAKISTANI_AIRLINES, VISA_RATES, TRANSPORT_ROUTES, VEHICLES };

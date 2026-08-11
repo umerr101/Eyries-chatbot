@@ -7,7 +7,7 @@ const crypto                     = require('crypto');
 const { getSession, updateSession, resetSession } = require('./stateManager');
 const { handleVisaFlow }       = require('./flows/visaFlow');
 const { handleTransportFlow }  = require('./flows/transportFlow');
-const { extractPassportData }  = require('./ocr/passport');
+const { extractPassportData, extractTicketData }  = require('./ocr/passport');
 const msg                      = require('./utils/messageBuilder');
 
 /**
@@ -57,6 +57,11 @@ async function routeMessage(phone, body, media) {
   if (session.flow === 'VISA') {
     const result = await handleVisaFlow(phone, session, body, media);
 
+    // TICKET_TRIGGER: need to run ticket OCR
+    if (result && typeof result === 'object' && !Array.isArray(result) && result.type === 'TICKET_TRIGGER') {
+      return ticketOcrAndBuildReplies(phone, result.media);
+    }
+
     // OCR_TRIGGER: need to run OCR and send multiple messages
     if (result && typeof result === 'object' && !Array.isArray(result) && result.type === 'OCR_TRIGGER') {
       return ocrAndBuildReplies(phone, result.media);
@@ -73,6 +78,33 @@ async function routeMessage(phone, body, media) {
   // ── Fallback ──────────────────────────────────────────────
   resetSession(phone);
   return msg.mainMenu();
+}
+
+/**
+ * Runs Gemini Vision Ticket OCR on the flight ticket media, validates departure date > today,
+ * and returns success message + passport prompt.
+ */
+async function ticketOcrAndBuildReplies(phone, mediaData) {
+  const session = getSession(phone);
+  try {
+    const res = await extractTicketData(mediaData);
+    if (res && res.isValid) {
+      updateSession(phone, {
+        step: 'AWAIT_PASSPORT',
+        ticketValidated: true,
+        departureDate: res.departureDate
+      });
+      const passportPrompt = msg.requestPassportImage(1, session.passengerCount || 1);
+      return [res.message, passportPrompt];
+    } else {
+      updateSession(phone, { step: 'AWAIT_TICKET_IMAGE' });
+      return res.errorMessage || '❌ *Invalid ticket booking image.* Please upload a clear photo showing your travel date.';
+    }
+  } catch (err) {
+    console.error('[Ticket Router] Error:', err.message);
+    updateSession(phone, { step: 'AWAIT_TICKET_IMAGE' });
+    return '❌ *Could not process ticket booking photo.* Please try sending the image again.';
+  }
 }
 
 /**

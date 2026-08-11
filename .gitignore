@@ -11,3 +11,5 @@ passports.db
 sessions.json
 eng.traineddata
 .wwebjs_auth_old/
+Master_Passports.xlsx
+passport_ocr_master_clean.py

@@ -7,6 +7,11 @@ const { CONTACTS, PAYMENT, VISA_RATES, TRANSPORT_ROUTES, VEHICLES } = require('.
 // ── MENU footer appended to every message ────────────────────
 const MENU_FOOTER = `\n\n_Type *MENU* at any time to return to the main menu._`;
 
+function mainMenuFooter() {
+  return MENU_FOOTER;
+}
+
+
 // ── Main Menu ────────────────────────────────────────────────
 function mainMenu() {
   return (
@@ -76,22 +81,39 @@ function visaWithoutTransportInfo() {
 }
 
 // ── First Leg Transport Options ────────────────────────────────
-function firstLegTransportMenu(baseRate) {
-  // Option 1: Jeddah to Makkah Sedan (Route 2 in config)
-  const toMakkahRate = TRANSPORT_ROUTES.find(r => r.id === 2).rates.sedan;
-  // Option 2: Jeddah to Jeddah City Sedan (Route 8 in config)
-  const toJeddahCityRate = TRANSPORT_ROUTES.find(r => r.id === 8).rates.sedan;
-  
+function firstLegRouteMenu(baseRate) {
   return (
-    `🚗 *Would you like to add 1st Leg Transport?*\n\n` +
-    `Your current visa rate: *${baseRate} SAR*\n\n` +
-    `1️⃣  Jeddah Airport → Makkah Hotel — *${baseRate + toMakkahRate} SAR total*\n` +
-    `2️⃣  Jeddah Airport → Jeddah City — *${baseRate + toJeddahCityRate} SAR total*\n` +
-    `3️⃣  No, skip 1st leg transport\n\n` +
-    `⚠️ _Note: An additional *+90 SAR* applies if you are flying via Jeddah Hajj Terminal._\n\n` +
-    `_(Reply 1, 2, or 3)_` +
+    `🚗 *1st Leg Transport Route Options*\n\n` +
+    `Current rate: *${baseRate} SAR/person*\n\n` +
+    `Please select your 1st leg transport route:\n\n` +
+    `1️⃣  Jeddah Airport → Makkah Hotel\n` +
+    `2️⃣  Jeddah Airport → Jeddah City\n` +
+    `3️⃣  Jeddah Airport → Madinah Hotel\n` +
+    `4️⃣  Madinah Airport → Madinah Hotel\n` +
+    `5️⃣  Madinah Airport → Makkah Hotel\n` +
+    `6️⃣  No, skip 1st leg transport\n\n` +
+    `_(Reply 1, 2, 3, 4, 5, or 6)_` +
     MENU_FOOTER
   );
+}
+
+function vehicleSelectionMenu(routeLabel, rates) {
+  return (
+    `🚐 *Select Vehicle Type for 1st Leg Transport*\n\n` +
+    `Route: *${routeLabel}*\n\n` +
+    `1️⃣  Sedan — (Capacity: 3–4) — *+${rates.sedan} SAR*\n` +
+    `2️⃣  GMC Yukon XL — (Capacity: 6) — *+${rates.gmcYukon} SAR*\n` +
+    `3️⃣  Hyundai Staria — (Capacity: 6) — *+${rates.hyundaiStaria} SAR*\n` +
+    `4️⃣  Toyota Hiace — (Capacity: 9) — *+${rates.toyotaHiace} SAR*\n` +
+    `5️⃣  Toyota Coaster — (Capacity: 17) — *+${rates.toyotaCoaster} SAR*\n` +
+    `6️⃣  Bus (47 Seats) — (Capacity: 47) — *+${rates.bus47} SAR*\n\n` +
+    `_(Reply 1, 2, 3, 4, 5, or 6)_` +
+    MENU_FOOTER
+  );
+}
+
+function firstLegTransportMenu(baseRate) {
+  return firstLegRouteMenu(baseRate);
 }
 
 // ── Hajj Terminal Surcharge Question ──────────────────────────
@@ -113,6 +135,16 @@ function rateConfirmation(rate, details = '') {
     (details ? `   ${details}\n` : ``) +
     `\nDo you agree to proceed at this rate?\n` +
     `Reply *YES* to confirm or *NO* to go back.` +
+    MENU_FOOTER
+  );
+}
+
+// ── Request Flight Ticket Image ────────────────────────────────
+function requestTicketImage() {
+  return (
+    `✈️ *Flight Ticket Booking Requirement*\n\n` +
+    `Before uploading passport photos, please send a clear photo of your *ticket booking*.\n\n` +
+    `⚠️ *Rule:* Your travel departure date must be a **future date (greater than today)**.` +
     MENU_FOOTER
   );
 }
@@ -296,14 +328,18 @@ function genericError() {
 }
 
 module.exports = {
+  mainMenuFooter,
   mainMenu,
   visaTypeMenu,
   longStayVisaDetails,
   visaWithTransportPassengerMenu,
   visaWithoutTransportInfo,
   firstLegTransportMenu,
+  firstLegRouteMenu,
+  vehicleSelectionMenu,
   hajjTerminalQuestion,
   rateConfirmation,
+  requestTicketImage,
   requestPassportImage,
   passengerCountPrompt,
   processingMessage,

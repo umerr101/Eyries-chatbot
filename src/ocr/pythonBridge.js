@@ -66,6 +66,31 @@ async function processPassportWithGemini(mediaData) {
 }
 
 /**
+ * Saves MessageMedia base64 data to a temp file and runs Ticket OCR via Python.
+ */
+async function processTicketWithGemini(mediaData) {
+  if (!mediaData || !mediaData.data) {
+    throw new Error('No media data provided for Ticket OCR');
+  }
+
+  const ext = (mediaData.mimetype || 'image/jpeg').split('/')[1]?.split(';')[0] || 'jpg';
+  const tmpPath = path.join(os.tmpdir(), `ticket_${Date.now()}.${ext}`);
+
+  try {
+    const buffer = Buffer.from(mediaData.data, 'base64');
+    fs.writeFileSync(tmpPath, buffer);
+    console.log(`[PythonBridge] Temp ticket file saved for OCR: ${tmpPath}`);
+
+    const result = await runPython(['ticket_ocr', tmpPath]);
+    return result;
+  } finally {
+    if (fs.existsSync(tmpPath)) {
+      try { fs.unlinkSync(tmpPath); } catch (_) {}
+    }
+  }
+}
+
+/**
  * Confirms record, translates to Arabic script, updates passports.db, and exports Master_Passports.xlsx.
  */
 async function confirmPassportWithGemini(passportNumber, englishData = null) {
@@ -78,5 +103,6 @@ async function confirmPassportWithGemini(passportNumber, englishData = null) {
 
 module.exports = {
   processPassportWithGemini,
+  processTicketWithGemini,
   confirmPassportWithGemini,
 };

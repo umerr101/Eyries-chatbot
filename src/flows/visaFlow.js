@@ -78,76 +78,103 @@ async function handleVisaFlow(phone, session, incomingMsg, mediaUrl) {
   if (session.step === 'WITHOUT_TRANSPORT_AIRLINE') {
     const airlineLower = (incomingMsg || '').trim().toLowerCase();
     const isPakistani  = PAKISTANI_AIRLINES.some(pa => airlineLower.includes(pa));
-    const baseRate     = isPakistani ? 640 : 550;  // 550 + 90 if Pakistani
-    const surchargeMsg = isPakistani
-      ? `\n_*Note:* Pakistani airline surcharge of 90 SAR applied (550 + 90 = *640 SAR*)_`
-      : ``;
 
     updateSession(phone, {
-      step: 'WITHOUT_TRANSPORT_FIRST_LEG',
+      step: 'WITHOUT_TRANSPORT_HAJJ_CHECK',
       airline: incomingMsg.trim(),
       isPakistaniAirline: isPakistani,
-      perPersonRate: baseRate,
+      baseVisaRate: 550,
     });
 
-    return msg.firstLegTransportMenu(baseRate) + surchargeMsg;
-  }
-
-  // ── STEP: First Leg Transport choice ──────────────────────
-  if (session.step === 'WITHOUT_TRANSPORT_FIRST_LEG') {
-    if (text === '1') {
-      const toMakkahRate = TRANSPORT_ROUTES.find(r => r.id === 2).rates.sedan;
-      const rateWithLeg  = session.perPersonRate + toMakkahRate;
-
-      updateSession(phone, {
-        step: 'WITHOUT_TRANSPORT_HAJJ_CHECK',
-        addFirstLeg: true,
-        firstLegChoice: 'jeddahToMakkah',
-        perPersonRate: rateWithLeg,
-      });
-      return msg.hajjTerminalQuestion(rateWithLeg);
-    }
-    if (text === '2') {
-      const toJeddahCityRate = TRANSPORT_ROUTES.find(r => r.id === 8).rates.sedan;
-      const rateWithLeg      = session.perPersonRate + toJeddahCityRate;
-
-      updateSession(phone, {
-        step: 'WITHOUT_TRANSPORT_HAJJ_CHECK',
-        addFirstLeg: true,
-        firstLegChoice: 'jeddahToJeddahCity',
-        perPersonRate: rateWithLeg,
-      });
-      return msg.hajjTerminalQuestion(rateWithLeg);
-    }
-    if (text === '3') {
-      updateSession(phone, {
-        step: 'WITHOUT_TRANSPORT_HAJJ_CHECK',
-        addFirstLeg: false,
-      });
-      return msg.hajjTerminalQuestion(session.perPersonRate);
-    }
-    return msg.firstLegTransportMenu(session.perPersonRate);
+    return msg.hajjTerminalQuestion(550);
   }
 
   // ── STEP: Hajj Terminal Surcharge Check ────────────────────
   if (session.step === 'WITHOUT_TRANSPORT_HAJJ_CHECK') {
     const HAJJ_SURCHARGE = 90;
-    let finalPerPerson = session.perPersonRate;
-    if (text === 'YES') {
-      finalPerPerson += HAJJ_SURCHARGE;
+    const isHajj = text === 'YES';
+    let currentRate = 550;
+    if (isHajj && session.isPakistaniAirline) {
+      currentRate += HAJJ_SURCHARGE;
+    } else if (isHajj) {
+      currentRate += HAJJ_SURCHARGE;
     }
-    const details = session.addFirstLeg
-      ? `${session.firstLegChoice === 'jeddahToMakkah' ? 'Jeddah Airport → Makkah' : 'Jeddah Airport → Jeddah City'} ${text === 'YES' ? '| Hajj Terminal (+90 SAR)' : ''}`
-      : `${session.airline} ${text === 'YES' ? '| Hajj Terminal surcharge (+90 SAR)' : ''}`;
 
     updateSession(phone, {
-      step: 'ASK_PASSENGERS',
-      isHajjTerminal: text === 'YES',
-      perPersonRate: finalPerPerson,
-      visaLabel: `Visa WITHOUT Transport (${details})`
+      step: 'WITHOUT_TRANSPORT_FIRST_LEG_ROUTE',
+      isHajjTerminal: isHajj,
+      perPersonRate: currentRate,
     });
 
-    return msg.passengerCountPrompt(`Visa WITHOUT Transport (${finalPerPerson} SAR/person)`);
+    return msg.firstLegRouteMenu(currentRate);
+  }
+
+  // ── STEP: First Leg Transport Route Choice ────────────────
+  if (session.step === 'WITHOUT_TRANSPORT_FIRST_LEG_ROUTE') {
+    const routeMap = {
+      '1': { id: 2, label: 'Jeddah Airport → Makkah Hotel' },
+      '2': { id: 8, label: 'Jeddah Airport → Jeddah City' },
+      '3': { id: 4, label: 'Jeddah Airport → Madinah Hotel' },
+      '4': { id: 7, label: 'Madinah Airport → Madinah Hotel' },
+      '5': { id: 3, label: 'Madinah Airport → Makkah Hotel' },
+    };
+
+    if (text === '6') {
+      updateSession(phone, {
+        step: 'ASK_PASSENGERS',
+        addFirstLeg: false,
+        visaLabel: `Visa WITHOUT Transport (${session.isHajjTerminal ? 'Hajj Terminal' : 'Standard'})`
+      });
+      return msg.passengerCountPrompt(`Visa WITHOUT Transport (${session.perPersonRate} SAR/person)`);
+    }
+
+    if (routeMap[text]) {
+      const selected = routeMap[text];
+      const routeObj = TRANSPORT_ROUTES.find(r => r.id === selected.id);
+
+      updateSession(phone, {
+        step: 'WITHOUT_TRANSPORT_FIRST_LEG_VEHICLE',
+        addFirstLeg: true,
+        selectedRouteId: selected.id,
+        selectedRouteLabel: selected.label,
+        routeRates: routeObj.rates,
+      });
+
+      return msg.vehicleSelectionMenu(selected.label, routeObj.rates);
+    }
+
+    return msg.firstLegRouteMenu(session.perPersonRate);
+  }
+
+  // ── STEP: First Leg Transport Vehicle Choice ───────────────
+  if (session.step === 'WITHOUT_TRANSPORT_FIRST_LEG_VEHICLE') {
+    const vehicleKeyMap = {
+      '1': { key: 'sedan', label: 'Sedan (3-4)' },
+      '2': { key: 'gmcYukon', label: 'GMC Yukon XL (6)' },
+      '3': { key: 'hyundaiStaria', label: 'Hyundai Staria (6)' },
+      '4': { key: 'toyotaHiace', label: 'Toyota Hiace (9)' },
+      '5': { key: 'toyotaCoaster', label: 'Toyota Coaster (17)' },
+      '6': { key: 'bus47', label: 'Bus (47 Seats)' },
+    };
+
+    if (vehicleKeyMap[text]) {
+      const vehicle = vehicleKeyMap[text];
+      const vehicleCost = session.routeRates[vehicle.key] || 0;
+      const totalPerPerson = session.perPersonRate + vehicleCost;
+
+      updateSession(phone, {
+        step: 'ASK_PASSENGERS',
+        selectedVehicleKey: vehicle.key,
+        selectedVehicleLabel: vehicle.label,
+        vehicleCost: vehicleCost,
+        perPersonRate: totalPerPerson,
+        visaLabel: `Visa WITHOUT Transport (${session.selectedRouteLabel} - ${vehicle.label})`
+      });
+
+      return msg.passengerCountPrompt(`Visa WITHOUT Transport (${totalPerPerson} SAR/person)`);
+    }
+
+    return msg.vehicleSelectionMenu(session.selectedRouteLabel, session.routeRates);
   }
 
   // ── STEP: Ask Passenger Count (Universal) ──────────────────
@@ -176,14 +203,23 @@ async function handleVisaFlow(phone, session, incomingMsg, mediaUrl) {
   // ── STEP: Confirm Rate & Passenger Count ─────────────────
   if (session.step === 'CONFIRM_RATE_AND_PASSENGERS') {
     if (text === 'YES') {
-      updateSession(phone, { step: 'AWAIT_PASSPORT', agreedToRate: true });
-      return msg.requestPassportImage(1, session.passengerCount || 1);
+      updateSession(phone, { step: 'AWAIT_TICKET_IMAGE', agreedToRate: true });
+      return msg.requestTicketImage();
     }
     if (text === 'NO') {
       resetSession(phone);
       return msg.mainMenu();
     }
     return `Please reply *YES* to confirm or *NO* to go back.`;
+  }
+
+  // ── STEP: Awaiting Ticket Image ────────────────────────────
+  if (session.step === 'AWAIT_TICKET_IMAGE') {
+    if (!mediaUrl) {
+      return msg.requestTicketImage();
+    }
+    updateSession(phone, { step: 'TICKET_PROCESSING' });
+    return { type: 'TICKET_TRIGGER', media: mediaUrl };
   }
 
   // ── STEP: Awaiting Passport Image ─────────────────────────
