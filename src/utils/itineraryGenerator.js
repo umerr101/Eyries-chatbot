@@ -140,6 +140,8 @@ async function generateItineraryPdf(bookingData = {}) {
  * Builds dynamic HTML markup for the itinerary voucher
  */
 function buildVoucherHtml({ voucherId, issueDate, agencyName, logoDataUrl, qrDataUrl, statusLabel, isApproved, bookingData }) {
+  const { loadClientConfig } = require('../configLoader');
+  const activeClient = loadClientConfig();
   const passengers = bookingData.passengers || [];
   const hasPassports = passengers.length > 0 && (passengers[0].firstName || passengers[0].passportNumber);
 

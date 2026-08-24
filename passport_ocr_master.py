@@ -137,6 +137,14 @@ initialize_db()
 
 def save_pending_record(data: Dict[str, Any], phone: str = "", request_id: str = "") -> Dict[str, Any]:
     """Saves OCR extracted data in 'Pending' state."""
+    pno = str(data.get('passport_number') or data.get('passportNumber') or 'N/A').upper()
+    fn = data.get('first_name') or data.get('firstName') or ''
+    ln = data.get('last_name') or data.get('lastName') or ''
+    nat = data.get('nationality') or 'Pakistani'
+    dob = data.get('date_of_birth') or data.get('dob') or 'N/A'
+    iss = data.get('date_of_issue') or data.get('issueDate') or 'N/A'
+    exp = data.get('date_of_expiry') or data.get('expiryDate') or 'N/A'
+
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute('''
@@ -144,16 +152,27 @@ def save_pending_record(data: Dict[str, Any], phone: str = "", request_id: str =
         (passport_number, first_name, last_name, nationality, date_of_birth, date_of_issue, date_of_expiry, customer_phone, request_id, status, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', CURRENT_TIMESTAMP)
     ''', (
-        data['passport_number'], data['first_name'], data['last_name'],
-        data['nationality'], data['date_of_birth'], data.get('date_of_issue', 'N/A'), data['date_of_expiry'],
+        pno, fn, ln,
+        nat, dob, iss, exp,
         phone or data.get('customer_phone', ''), request_id or data.get('request_id', '')
     ))
     conn.commit()
     conn.close()
-    return get_record(data['passport_number'])
+    return get_record(pno)
 
 def update_confirmed_record(passport_number: str, english_data: Dict[str, Any], arabic_data: Dict[str, Any], phone: str = "", request_id: str = "") -> Dict[str, Any]:
     """Updates record with confirmed English and Arabic data, setting status to 'Confirmed'."""
+    pno = str(passport_number or english_data.get('passport_number') or english_data.get('passportNumber') or 'N/A').upper()
+    fn = english_data.get('first_name') or english_data.get('firstName') or ''
+    ln = english_data.get('last_name') or english_data.get('lastName') or ''
+    nat = english_data.get('nationality') or 'Pakistani'
+    dob = english_data.get('date_of_birth') or english_data.get('dob') or 'N/A'
+    iss = english_data.get('date_of_issue') or english_data.get('issueDate') or 'N/A'
+    exp = english_data.get('date_of_expiry') or english_data.get('expiryDate') or 'N/A'
+    fn_ar = arabic_data.get('first_name_ar') or arabic_data.get('firstNameAr') or translate_single_field_to_arabic(fn)
+    ln_ar = arabic_data.get('last_name_ar') or arabic_data.get('lastNameAr') or translate_single_field_to_arabic(ln)
+    nat_ar = arabic_data.get('nationality_ar') or arabic_data.get('nationalityAr') or nat
+
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute('''
@@ -165,15 +184,15 @@ def update_confirmed_record(passport_number: str, english_data: Dict[str, Any], 
             status = 'Confirmed', updated_at = CURRENT_TIMESTAMP
         WHERE passport_number = ?
     ''', (
-        english_data['first_name'], english_data['last_name'], english_data['nationality'],
-        english_data['date_of_birth'], english_data.get('date_of_issue', 'N/A'), english_data['date_of_expiry'],
-        arabic_data['first_name_ar'], arabic_data['last_name_ar'], arabic_data['nationality_ar'],
+        fn, ln, nat,
+        dob, iss, exp,
+        fn_ar, ln_ar, nat_ar,
         phone, request_id,
-        passport_number
+        pno
     ))
     conn.commit()
     conn.close()
-    return get_record(passport_number)
+    return get_record(pno)
 
 def get_record(passport_number: str) -> Optional[Dict[str, Any]]:
     """Retrieves a record by passport number."""
