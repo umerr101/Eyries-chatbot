@@ -209,33 +209,41 @@ client.on('loading_screen', (percent, message) => {
   console.log(`⏳ [WhatsApp Web Syncing] ${percent}% - ${message || 'Loading chats'}`);
 });
 
+let syncTriggered = false;
+
 // ── Authenticated ──────────────────────────────────────────────
 client.on('authenticated', () => {
   console.log('🔐 Session authenticated. WhatsApp Web syncing in progress...');
   
   // Guard for WhatsApp Web session restore race condition:
-  // If Socket.hasSynced is already true before listener attached, trigger sync event immediately
+  // If Socket.hasSynced is already true before listener attached, trigger sync event once
   const syncCheckInterval = setInterval(async () => {
-    if (isLive) {
+    if (isLive || syncTriggered) {
       clearInterval(syncCheckInterval);
       return;
     }
     if (client.pupPage) {
       try {
-        const synced = await client.pupPage.evaluate(() => {
+        const canSync = await client.pupPage.evaluate(() => {
           try {
             if (typeof window.require === 'function') {
               const socket = window.require('WAWebSocketModel')?.Socket;
               if (socket && socket.hasSynced && typeof window.onAppStateHasSyncedEvent === 'function') {
-                window.onAppStateHasSyncedEvent();
                 return true;
               }
             }
           } catch (_) {}
           return false;
         });
-        if (synced) {
+
+        if (canSync && !syncTriggered && !isLive) {
+          syncTriggered = true;
           clearInterval(syncCheckInterval);
+          await client.pupPage.evaluate(() => {
+            if (typeof window.onAppStateHasSyncedEvent === 'function') {
+              window.onAppStateHasSyncedEvent();
+            }
+          });
         }
       } catch (_) {}
     }
@@ -251,6 +259,7 @@ client.on('auth_failure', (msg) => {
 client.on('disconnected', (reason) => {
   console.warn('⚠️ [WhatsApp Web Disconnected]:', reason);
   isLive = false;
+  syncTriggered = false;
 });
 
 // ── Global Process Error Protection ──────────────────────────
@@ -265,25 +274,23 @@ process.on('uncaughtException', (err) => {
 botStartTime = Math.floor(Date.now() / 1000) - 600;
 
 // ── Ready ──────────────────────────────────────────────────────
-client.on('ready', () => {
+client.on('ready', async () => {
   if (isLive) return;
   isLive = true;
+
+  // Guarantee message event listeners are always attached to WhatsApp Web
+  try {
+    if (typeof client.attachEventListeners === 'function') {
+      await client.attachEventListeners();
+    }
+  } catch (_) {}
+
   const info = client.info || {};
   const pushname = info.pushname || 'Connected User';
   const widUser = info.wid ? info.wid.user : 'WhatsApp User';
-  console.log('\n✅ WhatsApp Bot is LIVE!');
+  console.log('\n✅ WhatsApp Bot is LIVE and Listening!');
   console.log(`   Linked to: ${pushname} (${widUser})`);
-  console.log('   Send a message from ANOTHER phone to test.\n');
-});
-
-// ── Auth failure ───────────────────────────────────────────────
-client.on('auth_failure', (msg) => {
-  console.error('❌ Auth failed:', msg);
-});
-
-// ── Disconnected ───────────────────────────────────────────────
-client.on('disconnected', (reason) => {
-  console.log('⚠️  Disconnected:', reason);
+  console.log('   Send a message from ANY phone or Message Yourself to test.\n');
 });
 
 // ── Deduplication & Bot-sent message tracker ───────────────────
