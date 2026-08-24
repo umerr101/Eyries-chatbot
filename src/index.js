@@ -337,13 +337,29 @@ async function handleIncomingMessage(message) {
     ];
     if (SYSTEM_TYPES.includes(message.type)) return;
 
-    // If message is fromMe, only allow if sent in self-chat (Message Yourself)
+    // Determine effective sender and destination chat
+    let chatTarget = message.from;
+
+    // Handle outbound messages and self-chat testing (Message Yourself)
     if (message.fromMe) {
-      const isSelfChat = message.to === message.from;
-      if (!isSelfChat) return;
+      const myWid = client.info?.wid?._serialized;
+      const myUser = client.info?.wid?.user;
+      const toClean = (message.to || '').replace(/[^0-9]/g, '');
+      const fromClean = (message.from || '').replace(/[^0-9]/g, '');
+      const myWidClean = (myWid || '').replace(/[^0-9]/g, '') || (myUser || '');
+
+      const isSelfChat = message.to === message.from ||
+                         (myWid && message.to === myWid) ||
+                         (myWidClean && toClean === myWidClean) ||
+                         (toClean && fromClean && toClean === fromClean);
+
+      if (!isSelfChat) {
+        return; // Ignore regular outbound messages sent by human agents to external customers
+      }
+      chatTarget = message.to || message.from;
     }
 
-    const from     = message.from;
+    const from     = chatTarget;
     const body     = (message.body || '').trim();
     const hasMedia = message.hasMedia;
     const msgType  = message.type; // 'chat', 'image', 'document', etc.
