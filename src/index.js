@@ -212,14 +212,34 @@ client.on('loading_screen', (percent, message) => {
 // ── Authenticated ──────────────────────────────────────────────
 client.on('authenticated', () => {
   console.log('🔐 Session authenticated. WhatsApp Web syncing in progress...');
-  setTimeout(async () => {
-    if (!isLive && client.pupPage) {
+  
+  // Guard for WhatsApp Web session restore race condition:
+  // If Socket.hasSynced is already true before listener attached, trigger sync event immediately
+  const syncCheckInterval = setInterval(async () => {
+    if (isLive) {
+      clearInterval(syncCheckInterval);
+      return;
+    }
+    if (client.pupPage) {
       try {
-        const title = await client.pupPage.title();
-        console.log(`ℹ️ [Startup Sync] Page title: "${title}". WhatsApp Web finalizing connection...`);
+        const synced = await client.pupPage.evaluate(() => {
+          try {
+            if (typeof window.require === 'function') {
+              const socket = window.require('WAWebSocketModel')?.Socket;
+              if (socket && socket.hasSynced && typeof window.onAppStateHasSyncedEvent === 'function') {
+                window.onAppStateHasSyncedEvent();
+                return true;
+              }
+            }
+          } catch (_) {}
+          return false;
+        });
+        if (synced) {
+          clearInterval(syncCheckInterval);
+        }
       } catch (_) {}
     }
-  }, 12000);
+  }, 1000);
 });
 
 // ── Auth Failure ───────────────────────────────────────────────
