@@ -1,0 +1,230 @@
+{
+  "clientId": "six_sigma",
+  "agencyName": "Six Sigma",
+  "adminPhone": "923180978480@c.us",
+  "feedingPhone": "923180978480@c.us",
+  "accountsPhone": "923180978480@c.us",
+  "geminiApiKey": "",
+  "logoPath": "assets/six_sigma_logo.png",
+  "currency": "SAR",
+  "visaRates": {
+    "longStay": 600,
+    "visaWithoutTransportBase": 550,
+    "hajjTerminalSurcharge": 90,
+    "withTransport": {
+      "passengers": [
+        {
+          "range": "5-47 passengers",
+          "rate": 600
+        },
+        {
+          "range": "4 passengers",
+          "rate": 650
+        },
+        {
+          "range": "3 passengers",
+          "rate": 675
+        },
+        {
+          "range": "2 passengers",
+          "rate": 725
+        },
+        {
+          "range": "1 passenger",
+          "rate": 790
+        }
+      ]
+    }
+  },
+  "makkahHotels": [
+    {
+      "id": 1,
+      "name": "Voco (Shuttle Service)",
+      "location": "Ibrahim Khalil",
+      "distance": "Shuttle",
+      "rates": {
+        "sharing": null,
+        "quad": null,
+        "triple": null,
+        "double": null
+      }
+    },
+    {
+      "id": 2,
+      "name": "Kiswa Towers",
+      "location": "Tahseer Street",
+      "distance": "Shuttle",
+      "rates": {
+        "sharing": 18,
+        "quad": 22,
+        "triple": 29,
+        "double": 43
+      }
+    },
+    {
+      "id": 3,
+      "name": "Dar Hassan",
+      "location": "Ibrahim Khalil",
+      "distance": "Shuttle",
+      "rates": {
+        "sharing": 10,
+        "quad": 13,
+        "triple": 17,
+        "double": 25
+      }
+    },
+    {
+      "id": 4,
+      "name": "Jada Khalil",
+      "location": "Ibrahim Khalil",
+      "distance": "1100m",
+      "rates": {
+        "sharing": 22,
+        "quad": 28,
+        "triple": 37,
+        "double": 55
+      }
+    },
+    {
+      "id": 5,
+      "name": "Rawda Sharook",
+      "location": "Ibrahim Khalil",
+      "distance": "1000m",
+      "rates": {
+        "sharing": 28,
+        "quad": 33,
+        "triple": 44,
+        "double": 65
+      }
+    },
+    {
+      "id": 6,
+      "name": "Miad Al Majd",
+      "location": "Near Tunnel",
+      "distance": "750m",
+      "rates": {
+        "sharing": 25,
+        "quad": 30,
+        "triple": 40,
+        "double": 60
+      }
+    },
+    {
+      "id": 7,
+      "name": "Saif Al Majd",
+      "location": "Near Tunnel",
+      "distance": "700m",
+      "rates": {
+        "sharing": 37,
+        "quad": 47,
+        "triple": 62,
+        "double": 93
+      }
+    },
+    {
+      "id": 8,
+      "name": "Massarat Silver",
+      "location": "Ibrahim Khalil",
+      "distance": "700m",
+      "rates": {
+        "sharing": 45,
+        "quad": 57,
+        "triple": 76,
+        "double": 116
+      }
+    },
+    {
+      "id": 9,
+      "name": "Massarat Khalil",
+      "location": "Ibrahim Khalil",
+      "distance": "850m",
+      "rates": {
+        "sharing": 40,
+        "quad": 51,
+        "triple": 68,
+        "double": 103
+      }
+    },
+    {
+      "id": 10,
+      "name": "Badar Massa / Oliyan Khalil",
+      "location": "Ibrahim Khalil",
+      "distance": "600m",
+      "rates": {
+        "sharing": null,
+        "quad": 70,
+        "triple": 92,
+        "double": 135
+      }
+    }
+  ],
+  "madinahHotels": [
+    {
+      "id": 1,
+      "name": "Al Diyafa Towers",
+      "location": "Salam Gate",
+      "distance": "Shuttle",
+      "rates": {
+        "sharing": 24,
+        "quad": 32,
+        "triple": 42,
+        "double": 63
+      }
+    },
+    {
+      "id": 2,
+      "name": "Safeer Sakni 1",
+      "location": "Salam Gate",
+      "distance": "550m",
+      "rates": {
+        "sharing": 38,
+        "quad": 48,
+        "triple": 64,
+        "double": 95
+      }
+    },
+    {
+      "id": 3,
+      "name": "Safeer Sakni 2",
+      "location": "Top Ten",
+      "distance": "750m",
+      "rates": {
+        "sharing": 26,
+        "quad": 33,
+        "triple": 44,
+        "double": 68
+      }
+    },
+    {
+      "id": 4,
+      "name": "Rua Al Fakhama / Kayan Al Masi",
+      "location": "Salam Gate",
+      "distance": "150m",
+      "rates": {
+        "sharing": 73,
+        "quad": 92,
+        "triple": 123,
+        "double": 186
+      }
+    },
+    {
+      "id": 5,
+      "name": "Gulnar Taiba / Rau Al Masi",
+      "location": "Baqi Gate",
+      "distance": "50m",
+      "rates": {
+        "sharing": null,
+        "quad": null,
+        "triple": null,
+        "double": null
+      }
+    }
+  ],
+  "bankDetails": {
+    "bankName": "Meezan Bank Ltd",
+    "accountTitle": "Six Sigma Travels",
+    "accountNumber": "0123456789012345",
+    "iban": "PK36MEZN0001230123456789",
+    "branch": "Head Office, Islamabad"
+  }
+}

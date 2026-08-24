@@ -104,4 +104,110 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000);
 
-module.exports = { getSession, resetSession, updateSession };
+/**
+ * Searches persistent store & transient sessions for any session matching a given voucherId (case-insensitive).
+ * Returns { phone, session } or null.
+ */
+function findSessionByVoucherId(voucherId) {
+  if (!voucherId) return null;
+  const targetId = voucherId.trim().toUpperCase();
+
+  // First check persistent orders store
+  const order = db.getOrder(targetId);
+  if (order) {
+    return { phone: order.customerPhone, session: order.sessionData, status: order.status };
+  }
+
+  // Fallback to transient sessions
+  const stmt = db.prepare('SELECT phone, data FROM sessions');
+  const rows = stmt.all();
+
+  for (const row of rows) {
+    try {
+      const sess = JSON.parse(row.data);
+      if (sess && sess.voucherId && sess.voucherId.toUpperCase() === targetId) {
+        return { phone: row.phone, session: sess };
+      }
+    } catch (_) {}
+  }
+  return null;
+}
+
+function saveBookingOrder(voucherId, customerPhone, sessionData, status = 'PAYMENT PENDING') {
+  return db.saveOrder(voucherId, customerPhone, sessionData, status);
+}
+
+function getLatestPendingOrder(customerPhone) {
+  return db.getLatestPendingOrder(customerPhone);
+}
+
+function updateOrderStatus(voucherId, status, extraData = {}) {
+  return db.updateOrderStatus(voucherId, status, extraData);
+}
+
+/**
+ * Searches transient sessions for any session matching a given phone string or phone digits.
+ * Returns { phone, session } or null.
+ */
+function findSessionByPhone(inputPhone) {
+  if (!inputPhone) return null;
+  const raw = String(inputPhone).trim();
+
+  // Try direct match first
+  let stmt = db.prepare('SELECT phone, data FROM sessions WHERE phone = ?');
+  let row = stmt.get(raw);
+  if (row) return { phone: row.phone, session: JSON.parse(row.data) };
+
+  // Try numeric digits match (e.g. 24181320233095 matches 24181320233095@lid or 24181320233095@c.us)
+  const digits = raw.replace(/[^0-9]/g, '');
+  if (digits && digits.length >= 6) {
+    const allRows = db.prepare('SELECT phone, data FROM sessions').all();
+    for (const r of allRows) {
+      const rowDigits = r.phone.replace(/[^0-9]/g, '');
+      if (rowDigits === digits || r.phone.includes(digits) || rowDigits.includes(digits)) {
+        return { phone: r.phone, session: JSON.parse(r.data) };
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Tokenized Calendar URL Storage (Hides phone numbers & personal data from URL)
+ */
+const crypto = require('crypto');
+const _calendarTokens = new Map();
+
+function createCalendarToken(phone, city) {
+  const token = crypto.randomBytes(4).toString('hex');
+  _calendarTokens.set(token, {
+    phone,
+    city: (city || 'MAKKAH').toUpperCase(),
+    createdAt: Date.now()
+  });
+  return token;
+}
+
+function getCalendarTokenData(token) {
+  if (!token) return null;
+  const data = _calendarTokens.get(String(token).trim());
+  if (!data) return null;
+  if (Date.now() - data.createdAt > 2 * 60 * 60 * 1000) {
+    _calendarTokens.delete(token);
+    return null;
+  }
+  return data;
+}
+
+module.exports = {
+  getSession,
+  resetSession,
+  updateSession,
+  findSessionByVoucherId,
+  findSessionByPhone,
+  createCalendarToken,
+  getCalendarTokenData,
+  saveBookingOrder,
+  getLatestPendingOrder,
+  updateOrderStatus
+};

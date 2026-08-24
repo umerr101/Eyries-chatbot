@@ -8,13 +8,150 @@ require('dotenv').config();
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode               = require('qrcode-terminal');
 const path                 = require('path');
+const fs                   = require('fs');
 const crypto               = require('crypto');
 const axios                = require('axios');
 const { routeMessage }     = require('./router');
-const { getSession }       = require('./stateManager');
+const { getSession, updateSession } = require('./stateManager');
+const { notifyAdminNewOrder } = require('./utils/adminNotifier');
+const { generateItineraryPdf } = require('./utils/itineraryGenerator');
+const { handleAccountsCommand } = require('./utils/accountsVerifier');
 
-// ── Absolute path for session storage ─────────────────────────
-const SESSION_PATH = path.resolve('.wwebjs_auth');
+// ── PDF Voucher Web Server (Allows QR code scanning to open PDF) ──
+const express = require('express');
+const app = express();
+const PORT = process.env.PORT || 3000;
+const itinerariesDir = path.resolve(__dirname, '..', 'itineraries');
+if (!fs.existsSync(itinerariesDir)) {
+  fs.mkdirSync(itinerariesDir, { recursive: true });
+}
+app.use(express.json());
+app.use('/vouchers', express.static(itinerariesDir));
+
+// Serve visual calendar popup HTML (supports clean tokenized URLs e.g. /c/a9f3b2 or /calendar)
+app.get(['/calendar', '/c', '/c/:token', '/calendar/:token'], (req, res) => {
+  res.sendFile(path.resolve(__dirname, '..', 'assets', 'calendar.html'));
+});
+
+// Process interactive calendar submission
+app.post('/api/calendar-save', async (req, res) => {
+  try {
+    let { token, phone, city, checkInPretty, checkOutPretty, nights } = req.body;
+
+    const { findSessionByPhone, getCalendarTokenData } = require('./stateManager');
+    if (token) {
+      const tokenData = getCalendarTokenData(token);
+      if (tokenData) {
+        phone = tokenData.phone;
+        city = tokenData.city;
+      }
+    }
+
+    if (!phone || !city || !nights || nights < 1) {
+      return res.status(400).json({ success: false, error: 'Invalid or expired calendar session.' });
+    }
+
+    const matched = findSessionByPhone(phone);
+    const cleanPhone = matched ? matched.phone : (phone.includes('@') ? phone : `${phone.replace(/[^0-9]/g, '')}@c.us`);
+    const session = getSession(cleanPhone);
+    const hotel = session.selectedHotel;
+    const rooms = session.selectedRooms || [];
+
+    if (!hotel || rooms.length === 0) {
+      return res.status(400).json({ success: false, error: 'No active hotel selection found.' });
+    }
+
+    let cityTotal = 0;
+    const processedRooms = rooms.map(r => {
+      const pax = r.paxCapacity || 1;
+      const roomTotal = r.ratePerPax * pax * nights;
+      cityTotal += roomTotal;
+      return { ...r, nights, roomTotal };
+    });
+
+    const roomTypeSummary = processedRooms.map(r => `Room ${r.roomNumber}: ${r.label}`).join(', ');
+    const stayRangeText = `${checkInPretty} – ${checkOutPretty} (${nights} Nights)`;
+
+    const cityBooking = {
+      city: city.toUpperCase(),
+      hotelName: hotel.name,
+      roomType: roomTypeSummary,
+      stayRange: stayRangeText,
+      checkIn: checkInPretty,
+      checkOut: checkOutPretty,
+      ratePerNight: processedRooms[0]?.ratePerPax || 0,
+      rooms: processedRooms,
+      nights: nights,
+      cityTotal: cityTotal
+    };
+
+    if (city.toUpperCase() === 'MAKKAH') {
+      updateSession(cleanPhone, { makkahBooking: cityBooking });
+    } else {
+      updateSession(cleanPhone, { madinahBooking: cityBooking });
+    }
+
+    const currentSess = getSession(cleanPhone);
+    const hasMakkah = currentSess.currentCity === 'MAKKAH' || !!currentSess.makkahBooking;
+    const hasMadinah = currentSess.currentCity === 'MADINAH' || !!currentSess.madinahBooking;
+
+    let syncMsg = '';
+    if (!hasMakkah || !hasMadinah) {
+      const nextCity = !hasMakkah ? 'MAKKAH' : 'MADINAH';
+      updateSession(cleanPhone, { step: 'HOTEL_PROMPT_NEXT_CITY' });
+      syncMsg = (
+        `✅ *${city.toUpperCase()} Stay Dates Confirmed!*\n\n` +
+        `🏨 *${hotel.name}*\n` +
+        `📅 Check-in: *${checkInPretty}*\n` +
+        `📅 Check-out: *${checkOutPretty}*\n` +
+        `🌙 Duration: *${nights} night(s)*\n` +
+        `💰 Subtotal: *${cityTotal} SAR*\n\n` +
+        `Would you like to select a hotel for *${nextCity}* as well?\n\n` +
+        `1️⃣ *Yes, select ${nextCity} Hotel*\n` +
+        `2️⃣ *No, view final hotel summary*`
+      );
+    } else {
+      updateSession(cleanPhone, { step: 'HOTEL_ASK_FAMILY_HEAD' });
+      syncMsg = (
+        `✅ *${city.toUpperCase()} Stay Dates Confirmed!*\n\n` +
+        `🏨 *${hotel.name}*\n` +
+        `📅 Check-in: *${checkInPretty}*\n` +
+        `📅 Check-out: *${checkOutPretty}*\n` +
+        `🌙 Duration: *${nights} night(s)*\n` +
+        `💰 Subtotal: *${cityTotal} SAR*\n\n` +
+        `👤 *Family Head Name Required*\n\n` +
+        `Please enter the full name of the Family Head for this hotel booking _(e.g. Waleed Ahmad)_:`
+      );
+    }
+
+    await client.sendMessage(cleanPhone, syncMsg);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[CalendarSaveAPI] Error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🌐 PDF Voucher & Calendar Server running on port ${PORT}`);
+}).on('error', (err) => {
+  if (err.code !== 'EADDRINUSE') console.warn('[WebServer] Warning:', err.message);
+});
+
+// ── Absolute path for session storage (separate per client) ──
+const clientId = process.env.CLIENT_ID || 'default';
+const SESSION_PATH = path.resolve(`.wwebjs_auth_${clientId}`);
+
+// ── Clean stale lock files from LocalAuth data folder on startup ──
+try {
+  const sessionDataDir = path.join(SESSION_PATH, `session-${clientId}`);
+  if (fs.existsSync(sessionDataDir)) {
+    const lockFile = path.join(sessionDataDir, 'lockfile');
+    if (fs.existsSync(lockFile)) {
+      fs.unlinkSync(lockFile);
+    }
+  }
+} catch (_) {}
 
 // ── Locate installed Chrome ────────────────────────────────────
 const CHROME_PATH = process.env.CHROME_PATH ||
@@ -24,7 +161,7 @@ const CHROME_PATH = process.env.CHROME_PATH ||
 
 // ── Create WhatsApp client ─────────────────────────────────────
 const client = new Client({
-  authStrategy: new LocalAuth({ dataPath: SESSION_PATH }),
+  authStrategy: new LocalAuth({ clientId: clientId, dataPath: SESSION_PATH }),
   puppeteer: {
     headless: true,
     executablePath: CHROME_PATH,
@@ -40,8 +177,7 @@ const client = new Client({
     ],
   },
   webVersionCache: {
-    type: 'remote',
-    remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1014111620-alpha.html',
+    type: 'none',
   }
 });
 
@@ -66,16 +202,57 @@ client.on('qr', (qr) => {
   console.log('⚠️ Open WhatsApp → ⋮ Menu → Linked Devices → Link a Device → Scan\n');
 });
 
+let isLive = false;
+
+// ── Loading Screen Progress ────────────────────────────────────
+client.on('loading_screen', (percent, message) => {
+  console.log(`⏳ [WhatsApp Web Syncing] ${percent}% - ${message || 'Loading chats'}`);
+});
+
 // ── Authenticated ──────────────────────────────────────────────
 client.on('authenticated', () => {
-  console.log('🔐 Session authenticated.');
+  console.log('🔐 Session authenticated. WhatsApp Web syncing in progress...');
+  setTimeout(async () => {
+    if (!isLive && client.pupPage) {
+      try {
+        const title = await client.pupPage.title();
+        console.log(`ℹ️ [Startup Sync] Page title: "${title}". WhatsApp Web finalizing connection...`);
+      } catch (_) {}
+    }
+  }, 12000);
 });
+
+// ── Auth Failure ───────────────────────────────────────────────
+client.on('auth_failure', (msg) => {
+  console.error('❌ [Auth Failure] WhatsApp session authentication failed:', msg);
+});
+
+// ── Disconnected ───────────────────────────────────────────────
+client.on('disconnected', (reason) => {
+  console.warn('⚠️ [WhatsApp Web Disconnected]:', reason);
+  isLive = false;
+});
+
+// ── Global Process Error Protection ──────────────────────────
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('⚠️ [ProcessGuard] Unhandled Rejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ [ProcessGuard] Uncaught Exception:', err.stack || err.message);
+});
+
+// Initialize bot start time 10 mins prior so fresh messages during startup are never dropped
+botStartTime = Math.floor(Date.now() / 1000) - 600;
 
 // ── Ready ──────────────────────────────────────────────────────
 client.on('ready', () => {
-  const info = client.info;
+  if (isLive) return;
+  isLive = true;
+  const info = client.info || {};
+  const pushname = info.pushname || 'Connected User';
+  const widUser = info.wid ? info.wid.user : 'WhatsApp User';
   console.log('\n✅ WhatsApp Bot is LIVE!');
-  console.log(`   Linked to: ${info.pushname} (${info.wid.user})`);
+  console.log(`   Linked to: ${pushname} (${widUser})`);
   console.log('   Send a message from ANOTHER phone to test.\n');
 });
 
@@ -89,23 +266,34 @@ client.on('disconnected', (reason) => {
   console.log('⚠️  Disconnected:', reason);
 });
 
-// ── Deduplication tracker (whatsapp-web.js can fire 'message' twice) ──
+// ── Deduplication & Bot-sent message tracker ───────────────────
 const _processedMsgIds = new Set();
+const _botSentMessageIds = new Set();
 
-// ── Incoming Message Handler ───────────────────────────────────
-client.on('message', async (message) => {
+function trackBotSentMsg(sentMsg) {
+  if (sentMsg?.id?._serialized) {
+    _botSentMessageIds.add(sentMsg.id._serialized);
+    _processedMsgIds.add(sentMsg.id._serialized);
+    if (_botSentMessageIds.size > 1000) {
+      _botSentMessageIds.delete(_botSentMessageIds.values().next().value);
+    }
+  }
+}
+
+// ── Unified Incoming Message Handler ───────────────────────────
+async function handleIncomingMessage(message) {
   try {
-    // ── Deduplication (whatsapp-web.js can fire 'message' twice for the same msg)
-    // Only deduplicate when a valid serialized ID exists. Some WhatsApp versions
-    // return undefined for message.id or _serialized (e.g. @lid contacts) — in
-    // that case we skip dedup entirely so legitimate messages are not blocked.
-    const msgId = message.id?._serialized;
-    if (msgId) {
-      if (_processedMsgIds.has(msgId)) return;
-      _processedMsgIds.add(msgId);
-      if (_processedMsgIds.size > 300) {
-        _processedMsgIds.delete(_processedMsgIds.values().next().value);
-      }
+    if (!message) return;
+
+    // Ignore bot's own automated outbound messages
+    const msgId = message.id?._serialized || `${message.from}_${message.timestamp}_${message.body}`;
+    if (_botSentMessageIds.has(msgId)) return;
+
+    // Deduplication by message ID
+    if (_processedMsgIds.has(msgId)) return;
+    _processedMsgIds.add(msgId);
+    if (_processedMsgIds.size > 1000) {
+      _processedMsgIds.delete(_processedMsgIds.values().next().value);
     }
 
     // Skip group messages
@@ -129,17 +317,20 @@ client.on('message', async (message) => {
     ];
     if (SYSTEM_TYPES.includes(message.type)) return;
 
-    // Only process standard user interaction message types
-    const ALLOWED_TYPES = ['chat', 'image', 'document', 'audio', 'voice', 'video', 'location', 'vcard', 'ptt'];
-    if (!ALLOWED_TYPES.includes(message.type)) return;
-
-    // Skip messages sent BY the bot itself (unless explicitly testing)
-    if (message.fromMe) return;
+    // If message is fromMe, only allow if sent in self-chat (Message Yourself)
+    if (message.fromMe) {
+      const isSelfChat = message.to === message.from;
+      if (!isSelfChat) return;
+    }
 
     const from     = message.from;
     const body     = (message.body || '').trim();
     const hasMedia = message.hasMedia;
     const msgType  = message.type; // 'chat', 'image', 'document', etc.
+
+    // Only process standard user interaction message types
+    const ALLOWED_TYPES = ['chat', 'image', 'document', 'audio', 'voice', 'video', 'location', 'vcard', 'ptt'];
+    if (!ALLOWED_TYPES.includes(msgType)) return;
 
     // Skip empty body messages with no media attached
     if (!hasMedia && !body) return;
@@ -157,7 +348,8 @@ client.on('message', async (message) => {
       for (let attempt = 1; attempt <= 3 && !mediaData; attempt++) {
         try {
           mediaData = await message.downloadMedia();
-          if (mediaData && mediaData.data && mediaData.data.length > 5000) {
+          const isPdfDoc = (mediaData?.mimetype || '').includes('pdf') || msgType === 'document';
+          if (mediaData && mediaData.data && (mediaData.data.length > 20000 || (isPdfDoc && mediaData.data.length > 1000))) {
             console.log(`   ✓ METHOD 1 OK — ${mediaData.mimetype}, ${mediaData.data.length} chars`);
           } else {
             if (mediaData) console.warn(`   ⚠️ METHOD 1 got thumbnail (${mediaData.data?.length} chars) — too small`);
@@ -236,7 +428,7 @@ client.on('message', async (message) => {
             }
           }, serializedId);
 
-          if (result?.data && result.data.length > 5000) {
+          if (result?.data && result.data.length > 20000) {
             mediaData = new MessageMedia(result.mimetype || 'image/jpeg', result.data, 'passport.jpg');
             console.log(`   ✓ METHOD 2 OK — ${result.mimetype}, ${result.data.length} chars`);
           } else {
@@ -253,7 +445,7 @@ client.on('message', async (message) => {
           const raw = message._data || {};
           const b64  = raw.body || raw.mediaData;
           const mime = raw.mimetype || 'image/jpeg';
-          if (b64 && b64.length > 5000) {
+          if (b64 && b64.length > 20000) {
             mediaData = new MessageMedia(mime, b64, 'passport.jpg');
             console.log(`   ✓ METHOD 3 (raw body) OK — ${mime}, ${b64.length} chars`);
           } else {
@@ -325,12 +517,21 @@ client.on('message', async (message) => {
       }
     }
 
+    // Check if message is a confirmation command from Accounts Team (+923180978480)
+    const accountsReply = await handleAccountsCommand(client, from, body);
+    if (accountsReply) {
+      const sentAccounts = await client.sendMessage(from, accountsReply);
+      trackBotSentMsg(sentAccounts);
+      return;
+    }
+
     // Send instant status message if passport image was received
     const currentSession = getSession(from);
     if (mediaData && currentSession?.step === 'AWAIT_PASSPORT') {
       try {
         console.log('   Sending instant status update...');
-        await client.sendMessage(from, '⏳ _Processing your passport image... please wait a moment._');
+        const sentStatus = await client.sendMessage(from, '⏳ _Processing your passport image... please wait a moment._');
+        trackBotSentMsg(sentStatus);
       } catch (err) {
         console.warn('   Could not send instant status update:', err.message);
       }
@@ -344,15 +545,97 @@ client.on('message', async (message) => {
     if (Array.isArray(replies)) {
       for (const reply of replies) {
         if (reply) {
-          await client.sendMessage(from, reply);
+          const sent = await client.sendMessage(from, reply);
+          trackBotSentMsg(sent);
           await sleep(500); // small delay between multiple messages
         }
       }
     } else if (replies) {
-      await client.sendMessage(from, replies);
+      const sent = await client.sendMessage(from, replies);
+      trackBotSentMsg(sent);
     }
 
     console.log('   ✓ Reply sent.');
+
+    // ── Payment Pending PDF Itinerary Voucher & Payment Method Trigger ────────
+    const postSession = getSession(from);
+    if (postSession?.step === 'AWAIT_PAYMENT_RECEIPT' && !postSession?.voucherGenerated) {
+      updateSession(from, { voucherGenerated: true });
+
+      (async () => {
+        try {
+          console.log('[ItineraryGenerator] Generating PAYMENT PENDING PDF itinerary voucher...');
+          const itineraryRes = await generateItineraryPdf(postSession);
+          if (itineraryRes && itineraryRes.pdfPath && fs.existsSync(itineraryRes.pdfPath)) {
+            updateSession(from, { itineraryPdfPath: itineraryRes.pdfPath, voucherId: itineraryRes.voucherId });
+            const { saveBookingOrder } = require('./stateManager');
+            saveBookingOrder(itineraryRes.voucherId, from, getSession(from), 'PAYMENT PENDING');
+
+            const pdfMedia = MessageMedia.fromFilePath(itineraryRes.pdfPath);
+            console.log(`[ItineraryGenerator] Sending PAYMENT PENDING PDF voucher (${itineraryRes.voucherId}) to customer...`);
+            const sentVoucher = await client.sendMessage(from, pdfMedia, { caption: `📄 *Official Travel Itinerary Voucher (${itineraryRes.voucherId})*\nStatus: PAYMENT PENDING` });
+            trackBotSentMsg(sentVoucher);
+            await sleep(600);
+          }
+
+          // Send payment method / details directly after the itinerary voucher
+          const isPackage = postSession.flow?.startsWith('PACKAGE');
+          const paymentMsg = isPackage
+            ? msg.packagePaymentDetails(postSession.totalPkr, postSession.totalSar)
+            : msg.paymentDetails(postSession.totalSar, null, 'Total Visa Package Rate');
+
+          console.log(`[PaymentDetails] Sending payment method to customer...`);
+          const sentPayment = await client.sendMessage(from, paymentMsg);
+          trackBotSentMsg(sentPayment);
+
+        } catch (pdfErr) {
+          console.error('[ItineraryGenerator] Error generating/sending itinerary & payment:', pdfErr.message);
+        }
+      })();
+    }
+
+    // ── Forward Payment Receipt to Accounts Team (+923180978480) ──
+    if (postSession?.step === 'AWAIT_ACCOUNTS_VERIFICATION' && !postSession?.receiptForwardedToAccounts) {
+      updateSession(from, { receiptForwardedToAccounts: true });
+
+      (async () => {
+        try {
+          const { loadClientConfig } = require('./configLoader');
+          const activeClient = loadClientConfig();
+          const rawAccountsPhone = process.env.ACCOUNTS_WHATSAPP || process.env.ADMIN_WHATSAPP || activeClient.accountsPhone || activeClient.adminPhone || '923180978480@c.us';
+          const accountsPhone = rawAccountsPhone.replace(/[^0-9]/g, '') + '@c.us';
+          const cleanPhone = from.replace('@c.us', '');
+          const voucherId = postSession.voucherId || 'Voucher';
+
+          console.log(`[AccountsForwarder] Forwarding payment receipt for Voucher ${voucherId} to Accounts (${accountsPhone})...`);
+
+          const accountsMessage = (
+            `🚨 *NEW PAYMENT RECEIPT SUBMITTED FOR VERIFICATION!*\n\n` +
+            `👤 *Customer Phone:* +${cleanPhone}\n` +
+            `👤 *Family Head:* ${postSession.familyHeadName || 'Customer'}\n` +
+            `🎫 *Voucher Booking ID:* *${voucherId}*\n` +
+            `💰 *Grand Total:* ${postSession.totalSar || 0} SAR\n` +
+            `🇵🇰 *Total in PKR:* approx. ${postSession.totalPkr || 'N/A'} PKR\n\n` +
+            `👉 *To Approve & Release Confirmed Voucher, reply:* \`CONFIRM ${voucherId}\``
+          );
+
+          await client.sendMessage(accountsPhone, accountsMessage);
+
+          if (mediaData && mediaData.data) {
+            const receiptMedia = new MessageMedia(mediaData.mimetype || 'image/jpeg', mediaData.data, `receipt_${voucherId}.jpg`);
+            await client.sendMessage(accountsPhone, receiptMedia, { caption: `📸 Payment Receipt Screenshot for Voucher ${voucherId}` });
+          }
+
+          // Forward order details & passports/documents to admin as well
+          notifyAdminNewOrder(client, from, getSession(from)).catch(err => {
+            console.error('[AdminNotifier] Asynchronous notification error:', err.message);
+          });
+
+        } catch (fwdErr) {
+          console.error('[AccountsForwarder] Error forwarding payment receipt:', fwdErr.message);
+        }
+      })();
+    }
 
   } catch (err) {
     console.error('[Bot] Error:', err.message);
@@ -360,6 +643,16 @@ client.on('message', async (message) => {
       await client.sendMessage(message.from, '⚠️ Something went wrong. Please type *MENU* to restart.');
     } catch (_) {}
   }
+}
+
+// Bind both 'message' and 'message_create' to catch 100% of customer and self-test messages
+client.on('message', handleIncomingMessage);
+client.on('message_create', (msg) => {
+  if (!msg) return;
+  const msgId = msg.id?._serialized;
+  if (msgId && _botSentMessageIds.has(msgId)) return;
+  if (msgId && _processedMsgIds.has(msgId)) return;
+  handleIncomingMessage(msg);
 });
 
 function sleep(ms) {

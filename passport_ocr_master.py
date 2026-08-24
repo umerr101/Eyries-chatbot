@@ -2,7 +2,7 @@
 ================================================================================
 PASSPORT OCR, ARABIC TRANSLITERATION & MASTER EXCEL - ALL-IN-ONE MODULE
 ================================================================================
-API KEY INCLUDED: AQ.Ab8RN6JVLoVTgjeWIRlTvxsk1PkYE4axwjHA2wvrzS6HWwvTvA
+API KEY: Loaded securely from environment variables (GEMINI_API_KEY / CLIENT_GEMINI_KEY)
 
 REQUIRES DEPENDENCIES:
 pip install google-genai pandas openpyxl pillow pydantic python-dotenv
@@ -13,6 +13,7 @@ import os
 import io
 import sys
 import json
+import re
 import sqlite3
 import urllib.request
 import urllib.parse
@@ -47,6 +48,9 @@ EXCEL_FILE = os.path.join(os.path.dirname(__file__), "Master_Passports.xlsx")
 
 def get_gemini_api_keys(custom_key: Optional[str] = None) -> list:
     keys = []
+    client_key = os.getenv("CLIENT_GEMINI_KEY", "").strip()
+    if client_key:
+        keys.extend([k.strip() for k in client_key.split(",") if k.strip()])
     if custom_key:
         keys.extend([k.strip() for k in custom_key.split(",") if k.strip()])
     env_keys = os.getenv("GEMINI_API_KEY", "")
@@ -81,7 +85,13 @@ class ArabicTranslationSchema(BaseModel):
     nationality_ar: str = Field(..., description="Country name translated into standard Arabic text")
 
 class TicketSchema(BaseModel):
-    departure_date: str = Field(..., description="Flight departure date in YYYY-MM-DD format")
+    departure_date: str = Field(..., description="Outbound flight departure date in YYYY-MM-DD format (e.g. '2026-11-03')")
+    return_date: Optional[str] = Field(None, description="Return flight date in YYYY-MM-DD format if round-trip (e.g. '2026-11-17'), or 'N/A'")
+    airline_name: Optional[str] = Field(None, description="Airline carrier name e.g. 'Saudi Arabian Airlines', 'PIA', 'AirBlue'")
+    flight_numbers: Optional[str] = Field(None, description="Flight codes/numbers e.g. 'SV 735 / SV 734'")
+    origin_city: Optional[str] = Field(None, description="Departure city in Pakistan e.g. 'Lahore', 'Karachi', 'Islamabad'")
+    destination_city: Optional[str] = Field(None, description="Arrival city in Saudi Arabia e.g. 'Jeddah', 'Madinah'")
+    arrival_airport: Optional[str] = Field(None, description="Destination/arrival airport or city e.g. 'Jeddah', 'JED', 'Madinah', 'MED'")
 
 # ==============================================================================
 # DATABASE MANAGEMENT (SQLite)
@@ -102,6 +112,8 @@ def initialize_db():
             first_name_ar TEXT,
             last_name_ar TEXT,
             nationality_ar TEXT,
+            customer_phone TEXT,
+            request_id TEXT,
             status TEXT DEFAULT 'Pending',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -109,46 +121,54 @@ def initialize_db():
     ''')
     conn.commit()
     
-    # Auto-migrate table if date_of_issue column is missing
+    # Auto-migrate table if columns are missing
     cursor.execute("PRAGMA table_info(passport_records)")
     columns = [row[1] for row in cursor.fetchall()]
     if 'date_of_issue' not in columns:
         cursor.execute("ALTER TABLE passport_records ADD COLUMN date_of_issue TEXT")
-        conn.commit()
-        
+    if 'customer_phone' not in columns:
+        cursor.execute("ALTER TABLE passport_records ADD COLUMN customer_phone TEXT")
+    if 'request_id' not in columns:
+        cursor.execute("ALTER TABLE passport_records ADD COLUMN request_id TEXT")
+    conn.commit()
     conn.close()
 
 initialize_db()
 
-def save_pending_record(data: Dict[str, Any]) -> Dict[str, Any]:
+def save_pending_record(data: Dict[str, Any], phone: str = "", request_id: str = "") -> Dict[str, Any]:
     """Saves OCR extracted data in 'Pending' state."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute('''
         INSERT OR REPLACE INTO passport_records 
-        (passport_number, first_name, last_name, nationality, date_of_birth, date_of_issue, date_of_expiry, status, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending', CURRENT_TIMESTAMP)
+        (passport_number, first_name, last_name, nationality, date_of_birth, date_of_issue, date_of_expiry, customer_phone, request_id, status, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', CURRENT_TIMESTAMP)
     ''', (
         data['passport_number'], data['first_name'], data['last_name'],
-        data['nationality'], data['date_of_birth'], data.get('date_of_issue', 'N/A'), data['date_of_expiry']
+        data['nationality'], data['date_of_birth'], data.get('date_of_issue', 'N/A'), data['date_of_expiry'],
+        phone or data.get('customer_phone', ''), request_id or data.get('request_id', '')
     ))
     conn.commit()
     conn.close()
     return get_record(data['passport_number'])
 
-def update_confirmed_record(passport_number: str, english_data: Dict[str, Any], arabic_data: Dict[str, Any]) -> Dict[str, Any]:
+def update_confirmed_record(passport_number: str, english_data: Dict[str, Any], arabic_data: Dict[str, Any], phone: str = "", request_id: str = "") -> Dict[str, Any]:
     """Updates record with confirmed English and Arabic data, setting status to 'Confirmed'."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE passport_records 
         SET first_name = ?, last_name = ?, nationality = ?, date_of_birth = ?, date_of_issue = ?, date_of_expiry = ?,
-            first_name_ar = ?, last_name_ar = ?, nationality_ar = ?, status = 'Confirmed', updated_at = CURRENT_TIMESTAMP
+            first_name_ar = ?, last_name_ar = ?, nationality_ar = ?,
+            customer_phone = COALESCE(NULLIF(?, ''), customer_phone),
+            request_id = COALESCE(NULLIF(?, ''), request_id),
+            status = 'Confirmed', updated_at = CURRENT_TIMESTAMP
         WHERE passport_number = ?
     ''', (
         english_data['first_name'], english_data['last_name'], english_data['nationality'],
         english_data['date_of_birth'], english_data.get('date_of_issue', 'N/A'), english_data['date_of_expiry'],
         arabic_data['first_name_ar'], arabic_data['last_name_ar'], arabic_data['nationality_ar'],
+        phone, request_id,
         passport_number
     ))
     conn.commit()
@@ -166,43 +186,104 @@ def get_record(passport_number: str) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 # ==============================================================================
-# EXCEL EXPORTER SERVICE
+# EXCEL EXPORTER SERVICE (With Blank Lines Between User Requests)
 # ==============================================================================
-def export_confirmed_passports_to_excel() -> str:
-    """Exports all 'Confirmed' passports into styled Master_Passports.xlsx."""
+def export_confirmed_passports_to_excel(request_id: Optional[str] = None, direct_passengers: Optional[List[Dict[str, Any]]] = None) -> str:
+    """Exports 'Confirmed' passports into styled Master_Passports.xlsx. If direct_passengers or request_id/phone specified, exports strictly for that booking window."""
     conn = sqlite3.connect(DB_FILE)
-    df = pd.read_sql_query("""
-        SELECT 
-            passport_number AS "Passport Number / رقم الجواز",
-            first_name AS "First Name (English)",
-            last_name AS "Last Name (English)",
-            first_name_ar AS "First Name (Arabic) / الاسم الأول",
-            last_name_ar AS "Last Name (Arabic) / اسم العائلة",
-            nationality AS "Nationality / الجنسية",
-            date_of_birth AS "Date of Birth / تاريخ الميلاد",
-            date_of_issue AS "Issue Date / تاريخ الإصدار",
-            date_of_expiry AS "Expiry Date / تاريخ الانتهاء",
-            status AS "Status",
-            updated_at AS "Confirmed Date"
-        FROM passport_records 
-        WHERE status = 'Confirmed'
-        ORDER BY updated_at DESC
-    """, conn)
+    
+    if direct_passengers and isinstance(direct_passengers, list) and len(direct_passengers) > 0:
+        rows = []
+        clean_req = str(request_id or "ORDER").strip()
+        cursor = conn.cursor()
+        for p in direct_passengers:
+            fn = p.get('firstName') or p.get('first_name') or ''
+            ln = p.get('lastName') or p.get('last_name') or ''
+            fn_ar = p.get('firstNameAr') or p.get('first_name_ar') or translate_single_field_to_arabic(fn)
+            ln_ar = p.get('lastNameAr') or p.get('last_name_ar') or translate_single_field_to_arabic(ln)
+            pno = str(p.get('passportNumber') or p.get('passport_number') or 'N/A').upper()
+            nat = p.get('nationality') or 'Pakistani'
+            dob = p.get('dob') or p.get('date_of_birth') or 'N/A'
+            iss = p.get('issueDate') or p.get('date_of_issue') or 'N/A'
+            exp = p.get('expiryDate') or p.get('date_of_expiry') or 'N/A'
+            
+            # Sync to SQLite passport_records
+            cursor.execute('''
+                INSERT OR REPLACE INTO passport_records 
+                (passport_number, first_name, last_name, nationality, date_of_birth, date_of_issue, date_of_expiry, first_name_ar, last_name_ar, nationality_ar, customer_phone, request_id, status, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Confirmed', CURRENT_TIMESTAMP)
+            ''', (pno, fn, ln, nat, dob, iss, exp, fn_ar, ln_ar, nat, clean_req, clean_req))
+
+            rows.append({
+                "Customer Phone": clean_req,
+                "Request ID": clean_req,
+                "Passport Number / رقم الجواز": pno,
+                "First Name (English)": fn,
+                "Last Name (English)": ln,
+                "First Name (Arabic) / الاسم الأول": fn_ar,
+                "Last Name (Arabic) / اسم العائلة": ln_ar,
+                "Nationality / الجنسية": nat,
+                "Date of Birth / تاريخ الميلاد": dob,
+                "Issue Date / تاريخ الإصدار": iss,
+                "Expiry Date / تاريخ الانتهاء": exp,
+                "Status": "Confirmed",
+                "Confirmed Date": datetime.now().strftime('%Y-%m-%d')
+            })
+        conn.commit()
+        df = pd.DataFrame(rows)
+    elif request_id and str(request_id).strip():
+        clean_req = str(request_id).strip()
+        df = pd.read_sql_query("""
+            SELECT 
+                customer_phone AS "Customer Phone",
+                request_id AS "Request ID",
+                passport_number AS "Passport Number / رقم الجواز",
+                first_name AS "First Name (English)",
+                last_name AS "Last Name (English)",
+                first_name_ar AS "First Name (Arabic) / الاسم الأول",
+                last_name_ar AS "Last Name (Arabic) / اسم العائلة",
+                nationality AS "Nationality / الجنسية",
+                date_of_birth AS "Date of Birth / تاريخ الميلاد",
+                date_of_issue AS "Issue Date / تاريخ الإصدار",
+                date_of_expiry AS "Expiry Date / تاريخ الانتهاء",
+                status AS "Status",
+                updated_at AS "Confirmed Date"
+            FROM passport_records 
+            WHERE status = 'Confirmed' AND (request_id = ? OR customer_phone LIKE ?)
+            ORDER BY updated_at ASC, request_id ASC
+        """, conn, params=(clean_req, f"%{clean_req}%"))
+    else:
+        df = pd.read_sql_query("""
+            SELECT 
+                customer_phone AS "Customer Phone",
+                request_id AS "Request ID",
+                passport_number AS "Passport Number / رقم الجواز",
+                first_name AS "First Name (English)",
+                last_name AS "Last Name (English)",
+                first_name_ar AS "First Name (Arabic) / الاسم الأول",
+                last_name_ar AS "Last Name (Arabic) / اسم العائلة",
+                nationality AS "Nationality / الجنسية",
+                date_of_birth AS "Date of Birth / تاريخ الميلاد",
+                date_of_issue AS "Issue Date / تاريخ الإصدار",
+                date_of_expiry AS "Expiry Date / تاريخ الانتهاء",
+                status AS "Status",
+                updated_at AS "Confirmed Date"
+            FROM passport_records 
+            WHERE status = 'Confirmed'
+            ORDER BY updated_at ASC, request_id ASC
+        """, conn)
     conn.close()
 
-    if df.empty:
-        df = pd.DataFrame(columns=[
-            "Passport Number / رقم الجواز", "First Name (English)", "Last Name (English)",
-            "First Name (Arabic) / الاسم الأول", "Last Name (Arabic) / اسم العائلة",
-            "Nationality / الجنسية", "Date of Birth / تاريخ الميلاد", "Issue Date / تاريخ الإصدار", "Expiry Date / تاريخ الانتهاء",
-            "Status", "Confirmed Date"
-        ])
+    display_cols = [
+        "Customer Phone", "Passport Number / رقم الجواز", "First Name (English)", "Last Name (English)",
+        "First Name (Arabic) / الاسم الأول", "Last Name (Arabic) / اسم العائلة",
+        "Nationality / الجنسية", "Date of Birth / تاريخ الميلاد", "Issue Date / تاريخ الإصدار", "Expiry Date / تاريخ الانتهاء",
+        "Status", "Confirmed Date"
+    ]
 
-    with pd.ExcelWriter(EXCEL_FILE, engine='openpyxl') as writer:
-        df.to_excel(writer, sheet_name='Passports', index=False)
-
-    wb = openpyxl.load_workbook(EXCEL_FILE)
-    ws = wb['Passports']
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Passports'
 
     header_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
     header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
@@ -211,35 +292,38 @@ def export_confirmed_passports_to_excel() -> str:
         top=Side(style='thin', color='CBD5E1'), bottom=Side(style='thin', color='CBD5E1')
     )
 
-    for col_idx in range(1, len(df.columns) + 1):
-        cell = ws.cell(row=1, column=col_idx)
+    # Write Headers
+    for col_idx, col_name in enumerate(display_cols, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=col_name)
         cell.fill = header_fill
         cell.font = header_font
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = thin_border
 
-    row_font = Font(name="Calibri", size=10)
-    alt_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
+    current_user_group = None
+    row_write_idx = 2
 
-    for row_idx in range(2, ws.max_row + 1):
-        is_alt = (row_idx % 2 == 0)
-        for col_idx in range(1, len(df.columns) + 1):
-            cell = ws.cell(row=row_idx, column=col_idx)
-            cell.font = row_font
-            cell.border = thin_border
-            if is_alt:
-                cell.fill = alt_fill
-            if col_idx in [7, 8, 9]:
-                cell.alignment = Alignment(horizontal="right", vertical="center")
-            elif col_idx in [1, 4, 5, 6, 10, 11]:
+    if not df.empty:
+        for _, row_data in df.iterrows():
+            user_group = row_data.get('Request ID') or row_data.get('Customer Phone') or 'default'
+            
+            # Insert a blank line between different user requests
+            if current_user_group is not None and user_group != current_user_group:
+                row_write_idx += 1
+            
+            current_user_group = user_group
+
+            for col_idx, col_name in enumerate(display_cols, start=1):
+                val = row_data.get(col_name)
+                cell = ws.cell(row=row_write_idx, column=col_idx, value="" if pd.isna(val) else str(val))
+                cell.border = thin_border
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-            else:
-                cell.alignment = Alignment(horizontal="left", vertical="center")
+            row_write_idx += 1
 
     for col in ws.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = get_column_letter(col[0].column)
-        ws.column_dimensions[col_letter].width = max(max_len + 4, 15)
+        ws.column_dimensions[col_letter].width = max(max_len + 4, 16)
 
     ws.row_dimensions[1].height = 28
     wb.save(EXCEL_FILE)
@@ -330,7 +414,7 @@ def run_gemini_vision_ocr(image_bytes: bytes, api_key: Optional[str] = None) -> 
         Ensure date fields (date_of_birth, date_of_issue, date_of_expiry) are strictly formatted as YYYY-MM-DD.
         """
 
-        candidate_models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite', 'gemini-flash-latest']
+        candidate_models = ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-pro-latest', 'gemini-3-flash-preview']
         response = None
         import time
 
@@ -373,6 +457,21 @@ def run_gemini_vision_ocr(image_bytes: bytes, api_key: Optional[str] = None) -> 
 
     return None
 
+def is_dummy_placeholder(data: Dict[str, Any]) -> bool:
+    """Detects if Vision AI returned dummy/mock placeholder data (e.g. John Doe / 123456789)."""
+    fn = str(data.get('first_name', '')).upper().strip()
+    ln = str(data.get('last_name', '')).upper().strip()
+    pno = str(data.get('passport_number', '')).upper().strip()
+    nat = str(data.get('nationality', '')).upper().strip()
+    
+    if fn in ['JOHN', 'FIRSTNAME', 'SAMPLE'] and ln in ['DOE', 'LASTNAME', 'SPECIMEN']:
+        return True
+    if pno in ['123456789', 'AT0000000', '000000000', 'XXXXXXXXX']:
+        return True
+    if (fn == 'JOHN' or ln == 'DOE') and (pno == '123456789' or nat in ['AMERICAN', 'USA']):
+        return True
+    return False
+
 def run_openrouter_vision_ocr(image_bytes: bytes) -> Optional[Dict[str, Any]]:
     """Fallback Vision OCR using OpenRouter free vision models."""
     key = OPENROUTER_API_KEY or os.getenv("OPENROUTER_API_KEY", "").strip()
@@ -385,8 +484,9 @@ def run_openrouter_vision_ocr(image_bytes: bytes) -> Optional[Dict[str, Any]]:
 
         models = [
             'openrouter/free',
+            'meta-llama/llama-3.2-11b-vision-instruct:free',
+            'qwen/qwen-2-vl-72b-instruct:free',
             'google/gemma-4-31b-it:free',
-            'google/gemma-4-26b-a4b-it:free',
             'nvidia/nemotron-nano-12b-v2-vl:free'
         ]
         prompt = (
@@ -429,6 +529,9 @@ def run_openrouter_vision_ocr(image_bytes: bytes) -> Optional[Dict[str, Any]]:
                         content = content.split("```")[1].split("```")[0].strip()
                     raw_dict = json.loads(content)
                     data = PassportSchema.model_validate(raw_dict).model_dump()
+                    if is_dummy_placeholder(data):
+                        sys.stderr.write(f"[Fallback Vision OCR] OpenRouter ({m}) returned mock placeholder data, skipping...\n")
+                        continue
                     sys.stderr.write(f"[Fallback Vision OCR] OpenRouter ({m}) succeeded.\n")
                     return apply_father_name_rule(data)
             except Exception as e:
@@ -449,7 +552,7 @@ def run_groq_vision_ocr(image_bytes: bytes) -> Optional[Dict[str, Any]]:
         b64_data = base64.b64encode(compressed_bytes).decode("utf-8")
         data_url = f"data:{mime_type};base64,{b64_data}"
 
-        models = ['llama-3.2-11b-vision-preview', 'llama-3.2-90b-vision-preview']
+        models = ['llama-3.2-90b-vision-preview', 'llama-3.2-11b-vision-instruct']
         prompt = (
             "Extract all passport data accurately from this document photo.\n"
             "Return ONLY a JSON object with keys: first_name, last_name, father_name, passport_number, nationality, date_of_birth, date_of_issue, date_of_expiry.\n"
@@ -489,6 +592,9 @@ def run_groq_vision_ocr(image_bytes: bytes) -> Optional[Dict[str, Any]]:
                         content = content.split("```")[1].split("```")[0].strip()
                     raw_dict = json.loads(content)
                     data = PassportSchema.model_validate(raw_dict).model_dump()
+                    if is_dummy_placeholder(data):
+                        sys.stderr.write(f"[Fallback Vision OCR] Groq Vision ({m}) returned mock placeholder data, skipping...\n")
+                        continue
                     sys.stderr.write(f"[Fallback Vision OCR] Groq Vision ({m}) succeeded.\n")
                     return apply_father_name_rule(data)
             except Exception as e:
@@ -846,7 +952,7 @@ def process_passport_image(image_bytes: bytes) -> Dict[str, Any]:
         "whatsapp_message": msg
     }
 
-def confirm_and_translate_passport(passport_number: str, english_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def confirm_and_translate_passport(passport_number: str, english_data: Optional[Dict[str, Any]] = None, phone: str = "", request_id: str = "") -> Dict[str, Any]:
     """
     1. Call when WhatsApp user replies 'YES' (Confirm).
     2. Translates details to Arabic script silently in background.
@@ -859,11 +965,11 @@ def confirm_and_translate_passport(passport_number: str, english_data: Optional[
         if not english_data:
             return {"success": False, "error": f"No record found for passport {passport_number}"}
     else:
-        save_pending_record(english_data)
+        save_pending_record(english_data, phone=phone, request_id=request_id)
             
     arabic_data = run_arabic_translation(english_data)
-    confirmed_record = update_confirmed_record(passport_number, english_data, arabic_data)
-    excel_path = export_confirmed_passports_to_excel()
+    confirmed_record = update_confirmed_record(passport_number, english_data, arabic_data, phone=phone, request_id=request_id)
+    excel_path = export_confirmed_passports_to_excel(request_id)
     
     msg = "✅ *Passport Confirmed & Recorded!*"
     
@@ -884,7 +990,7 @@ def validate_ticket_date(departure_date_str: str) -> tuple[bool, str, str]:
 
     try:
         exp_date = None
-        for fmt in ['%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d', '%d-%m-%Y', '%d %b %Y', '%d-%b-%Y']:
+        for fmt in ['%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d', '%d-%m-%Y', '%d %b %Y', '%d-%b-%Y', '%d-%b-%y']:
             try:
                 exp_date = datetime.strptime(departure_date_str.strip(), fmt)
                 break
@@ -912,21 +1018,34 @@ def validate_ticket_date(departure_date_str: str) -> tuple[bool, str, str]:
         sys.stderr.write(f"Ticket date validation error: {e}\n")
         return False, "", "❌ *Could not validate ticket departure date.* Please send a clear ticket photo."
 
-def run_gemini_ticket_ocr(image_bytes: bytes, api_key: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def run_gemini_ticket_ocr(file_bytes: bytes, mime_type: str = "image/jpeg", api_key: Optional[str] = None) -> Optional[Dict[str, Any]]:
     keys = get_gemini_api_keys(api_key)
     try:
         from google import genai
         from google.genai import types
-        compressed_bytes, mime_type = compress_image_if_needed(image_bytes)
+
+        if mime_type == "application/pdf" or file_bytes.startswith(b"%PDF"):
+            compressed_bytes = file_bytes
+            payload_mime = "application/pdf"
+        else:
+            compressed_bytes, payload_mime = compress_image_if_needed(file_bytes)
 
         prompt = """
-        Extract the flight departure/travel date from this ticket booking image.
-        Look for departure date, flight date, travel date, or date of travel.
-        Format the date strictly as YYYY-MM-DD.
-        Return ONLY a JSON object with key: departure_date.
+        Extract from this flight ticket booking document or image:
+        1. departure_date: Outbound flight departure date (Flight 1 / Leg 1) strictly in YYYY-MM-DD format (e.g. '27 AUG 2026' -> '2026-08-27').
+        2. return_date: Return flight departure date (Flight 2 / Leg 2 return segment e.g. '17 NOV 2026' -> '2026-11-17') strictly in YYYY-MM-DD format. Look for 'Flight 2', 'Return', or second flight box.
+        3. airline_name: Airline carrier name e.g. 'PIA', 'Saudi Arabian Airlines', 'Airblue'.
+        4. flight_numbers: Combined flight numbers for outbound and return e.g. 'PK 731 / PK 732' or 'SV 735 / SV 734'.
+        5. origin_city: Departure city or airport code e.g. 'Karachi', 'KHI', 'Lahore', 'LHE', 'Islamabad', 'ISB'.
+        6. destination_city: Arrival city or airport code e.g. 'Jeddah', 'JED', 'Madinah', 'MED'.
+        7. arrival_airport: Arrival airport code e.g. 'JED', 'MED'.
+
+        CRITICAL MULTI-FLIGHT INSTRUCTION:
+        - If there is a 'Flight 1' and 'Flight 2' (or return segment), return_date MUST be the departure date of Flight 2 (e.g. 17 NOV 2026 -> 2026-11-17).
+        - Format all dates strictly as YYYY-MM-DD.
         """
 
-        candidate_models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite', 'gemini-flash-latest']
+        candidate_models = ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-pro-latest', 'gemini-3-flash-preview']
         response = None
         for k in keys:
             key_exhausted = False
@@ -938,7 +1057,7 @@ def run_gemini_ticket_ocr(image_bytes: bytes, api_key: Optional[str] = None) -> 
                     try:
                         response = client.models.generate_content(
                             model=m,
-                            contents=[types.Part.from_bytes(data=compressed_bytes, mime_type=mime_type), prompt],
+                            contents=[types.Part.from_bytes(data=compressed_bytes, mime_type=payload_mime), prompt],
                             config=types.GenerateContentConfig(
                                 response_mime_type="application/json",
                                 response_schema=TicketSchema,
@@ -964,14 +1083,19 @@ def run_gemini_ticket_ocr(image_bytes: bytes, api_key: Optional[str] = None) -> 
         sys.stderr.write(f"Gemini ticket OCR exception: {e}\n")
     return None
 
-def run_openrouter_ticket_ocr(image_bytes: bytes) -> Optional[Dict[str, Any]]:
+def run_openrouter_ticket_ocr(file_bytes: bytes, mime_type: str = "image/jpeg") -> Optional[Dict[str, Any]]:
     key = OPENROUTER_API_KEY or os.getenv("OPENROUTER_API_KEY", "").strip()
     if not key:
         return None
     try:
-        compressed_bytes, mime_type = compress_image_if_needed(image_bytes)
+        if mime_type == "application/pdf" or file_bytes.startswith(b"%PDF"):
+            compressed_bytes = file_bytes
+            payload_mime = "application/pdf"
+        else:
+            compressed_bytes, payload_mime = compress_image_if_needed(file_bytes)
+
         b64_data = base64.b64encode(compressed_bytes).decode("utf-8")
-        data_url = f"data:{mime_type};base64,{b64_data}"
+        data_url = f"data:{payload_mime};base64,{b64_data}"
         models = ['openrouter/free', 'google/gemma-4-31b-it:free']
         prompt = "Extract flight departure date from this ticket booking as JSON: {\"departure_date\": \"YYYY-MM-DD\"}"
         for m in models:
@@ -994,25 +1118,137 @@ def run_openrouter_ticket_ocr(image_bytes: bytes) -> Optional[Dict[str, Any]]:
         pass
     return None
 
-def run_ticket_ocr(image_bytes: bytes, api_key: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    res = run_gemini_ticket_ocr(image_bytes, api_key)
+def run_ticket_ocr(file_bytes: bytes, is_pdf: bool = False, api_key: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    mime_type = "application/pdf" if (is_pdf or file_bytes.startswith(b"%PDF")) else "image/jpeg"
+    res = run_gemini_ticket_ocr(file_bytes, mime_type=mime_type, api_key=api_key)
     if res:
         return res
-    return run_openrouter_ticket_ocr(image_bytes)
+    return run_openrouter_ticket_ocr(file_bytes, mime_type=mime_type)
 
-def process_ticket_booking_image(image_bytes: bytes) -> Dict[str, Any]:
-    ticket_data = run_ticket_ocr(image_bytes)
+def format_ticket_date_pretty(date_str: str) -> str:
+    if not date_str or str(date_str).strip().upper() in ['N/A', 'NONE', 'NOT DETECTED', '']:
+        return ""
+    try:
+        for fmt in ['%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d', '%d-%m-%Y', '%d %b %Y', '%d-%b-%Y', '%d-%b-%y']:
+            try:
+                dt = datetime.strptime(str(date_str).strip(), fmt)
+                return dt.strftime('%d %b %Y')
+            except ValueError:
+                continue
+    except Exception:
+        pass
+    return str(date_str)
+
+AIRLINE_CODE_MAP = {
+    'PAKISTAN INTERNATIONAL AIRLINES': 'PK',
+    'PAKISTAN INTERNATIONAL AIRLINE': 'PK',
+    'PIA': 'PK',
+    'SAUDI ARABIAN AIRLINES': 'SV',
+    'SAUDIA': 'SV',
+    'SAUDI AIRLINES': 'SV',
+    'AIRBLUE': 'PA',
+    'SERENE AIR': 'ER',
+    'SERENEAIR': 'ER',
+    'FLY JINNAH': '9P',
+    'QATAR AIRWAYS': 'QR',
+    'EMIRATES': 'EK',
+    'ETIHAD AIRWAYS': 'EY',
+    'FLYNAS': 'XY',
+    'OMAN AIR': 'WY',
+    'GULF AIR': 'GF',
+}
+
+CITY_CODE_MAP = {
+    'KARACHI': 'KHI',
+    'LAHORE': 'LHE',
+    'ISLAMABAD': 'ISB',
+    'PESHAWAR': 'PEW',
+    'MULTAN': 'MUX',
+    'SIALKOT': 'SKT',
+    'QUETTA': 'UET',
+    'JEDDAH': 'JED',
+    'MADINAH': 'MED',
+    'MEDINA': 'MED',
+}
+
+def get_airline_short_code(airline_name: str, flight_numbers: str) -> str:
+    if flight_numbers:
+        match = re.search(r'([A-Z0-9]{2})\s*\d+', str(flight_numbers).upper())
+        if match:
+            return match.group(1)
+    clean_name = str(airline_name or '').strip().upper()
+    if clean_name in AIRLINE_CODE_MAP:
+        return AIRLINE_CODE_MAP[clean_name]
+    for key, val in AIRLINE_CODE_MAP.items():
+        if key in clean_name:
+            return val
+    return clean_name or 'SV'
+
+def get_city_short_code(city_name: str) -> str:
+    clean_city = str(city_name or '').strip().upper()
+    if clean_city in CITY_CODE_MAP:
+        return CITY_CODE_MAP[clean_city]
+    for key, val in CITY_CODE_MAP.items():
+        if key in clean_city:
+            return val
+    return clean_city[:3] if clean_city else 'KHI'
+
+def process_ticket_booking_image(file_bytes: bytes, is_pdf: bool = False) -> Dict[str, Any]:
+    ticket_data = run_ticket_ocr(file_bytes, is_pdf=is_pdf)
     if not ticket_data or not isinstance(ticket_data, dict):
         return {
             "success": False,
             "error": "Could not read ticket booking details. Please ensure the departure date is clearly visible."
         }
     dep_date = ticket_data.get('departure_date', '')
+    ret_date = ticket_data.get('return_date', '')
+    raw_airport = str(ticket_data.get('arrival_airport') or '').upper().strip()
+
+    arrival_airport = "UNKNOWN"
+    if "MED" in raw_airport or "MADINAH" in raw_airport or "MEDINA" in raw_airport:
+        arrival_airport = "MADINAH"
+    elif "JED" in raw_airport or "JEDDAH" in raw_airport:
+        arrival_airport = "JEDDAH"
+
     is_valid, formatted_date, whatsapp_msg = validate_ticket_date(dep_date)
+
+    dep_pretty = format_ticket_date_pretty(dep_date)
+    ret_pretty = format_ticket_date_pretty(ret_date) if (ret_date and ret_date.upper() != 'N/A') else ""
+
+    if dep_pretty and ret_pretty and ret_pretty != dep_pretty:
+        travel_period = f"{dep_pretty} – {ret_pretty}"
+    elif dep_pretty:
+        travel_period = dep_pretty
+    else:
+        travel_period = "Confirmed"
+
+    airline = ticket_data.get('airline_name') or 'PIA'
+    flight_nums = ticket_data.get('flight_numbers') or ''
+    origin_raw = ticket_data.get('origin_city') or 'Karachi'
+    dest_raw = ticket_data.get('destination_city') or (arrival_airport if arrival_airport != "UNKNOWN" else 'Jeddah')
+
+    short_carrier = get_airline_short_code(airline, flight_nums)
+    origin_code = get_city_short_code(origin_raw)
+    dest_code = get_city_short_code(dest_raw)
+
+    carrier_label = f"{short_carrier} ({flight_nums})" if flight_nums else short_carrier
+
+    if ret_pretty:
+        flight_route = f"{carrier_label} | {origin_code} → {dest_code} ({dep_pretty}) | {dest_code} → {origin_code} ({ret_pretty})"
+    else:
+        flight_route = f"{carrier_label} | {origin_code} → {dest_code} ({dep_pretty})"
+
     return {
         "success": is_valid,
         "departure_date": dep_date,
+        "return_date": ret_date,
+        "arrival_airport": arrival_airport,
         "formatted_date": formatted_date,
+        "travel_period": travel_period,
+        "airline_name": airline,
+        "short_carrier": short_carrier,
+        "flight_numbers": flight_nums,
+        "flight_route": flight_route,
         "whatsapp_message": whatsapp_msg
     }
 
@@ -1041,15 +1277,16 @@ if __name__ == "__main__":
 
     elif action == "ticket_ocr":
         if len(sys.argv) < 3:
-            print(json.dumps({"error": "Ticket image file path required for ticket_ocr"}))
+            print(json.dumps({"error": "Ticket file path required for ticket_ocr"}))
             sys.exit(1)
-        image_path = sys.argv[2]
-        if not os.path.exists(image_path):
-            print(json.dumps({"error": f"Image file not found: {image_path}"}))
+        file_path = sys.argv[2]
+        if not os.path.exists(file_path):
+            print(json.dumps({"error": f"Ticket file not found: {file_path}"}))
             sys.exit(1)
-        with open(image_path, "rb") as f:
-            image_bytes = f.read()
-        res = process_ticket_booking_image(image_bytes)
+        with open(file_path, "rb") as f:
+            file_bytes = f.read()
+        is_pdf = file_path.lower().endswith(".pdf") or file_bytes.startswith(b"%PDF")
+        res = process_ticket_booking_image(file_bytes, is_pdf=is_pdf)
         print(json.dumps(res))
 
     elif action == "confirm":
@@ -1058,15 +1295,30 @@ if __name__ == "__main__":
             sys.exit(1)
         passport_num = sys.argv[2]
         eng_data = None
+        phone = ""
+        req_id = ""
         if len(sys.argv) >= 4:
             try:
-                raw_json = " ".join(sys.argv[3:])
-                eng_data = json.loads(raw_json)
+                eng_data = json.loads(sys.argv[3])
             except Exception as e:
-                sys.stderr.write(f"JSON parse error in CLI confirm: {e}\n")
                 eng_data = None
-        res = confirm_and_translate_passport(passport_num, eng_data)
+        if len(sys.argv) >= 5:
+            phone = sys.argv[4]
+        if len(sys.argv) >= 6:
+            req_id = sys.argv[5]
+        res = confirm_and_translate_passport(passport_num, eng_data, phone=phone, request_id=req_id)
         print(json.dumps(res))
+
+    elif action == "export_excel":
+        req_id = sys.argv[2] if (len(sys.argv) >= 3 and sys.argv[2] != "ALL") else None
+        direct_passengers = None
+        if len(sys.argv) >= 4:
+            try:
+                direct_passengers = json.loads(sys.argv[3])
+            except Exception as e:
+                direct_passengers = None
+        excel_p = export_confirmed_passports_to_excel(req_id, direct_passengers=direct_passengers)
+        print(json.dumps({"success": True, "excel_file": excel_p}))
 
     else:
         print(json.dumps({"error": f"Unknown action: {action}"}))

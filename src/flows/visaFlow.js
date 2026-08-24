@@ -6,6 +6,7 @@ const { updateSession, resetSession }   = require('../stateManager');
 const { extractPassportData }           = require('../ocr/passport');
 const { confirmPassportWithGemini }     = require('../ocr/pythonBridge');
 const msg                               = require('../utils/messageBuilder');
+const { getEffectiveExchangeRate }      = require('../utils/exchangeRate');
 const { PAKISTANI_AIRLINES, VISA_RATES, TRANSPORT_ROUTES } = require('../config');
 
 /**
@@ -21,10 +22,10 @@ async function handleVisaFlow(phone, session, incomingMsg, mediaUrl) {
       updateSession(phone, {
         step: 'ASK_PASSENGERS',
         visaType: 'longStay',
-        perPersonRate: 650,
+        perPersonRate: 600,
         visaLabel: 'Long Stay Visa (up to 80 days)'
       });
-      return msg.passengerCountPrompt('Long Stay Visa (up to 80 days) — 650 SAR/person');
+      return msg.longStayVisaDetails();
     }
     if (text === '2') {
       updateSession(phone, { step: 'WITH_TRANSPORT_PASSENGERS', visaType: 'withTransport' });
@@ -58,18 +59,19 @@ async function handleVisaFlow(phone, session, incomingMsg, mediaUrl) {
       const exactCountMap = { 2: 4, 3: 3, 4: 2, 5: 1 };
       const count = exactCountMap[choice];
       const totalRate = selected.rate * count;
+      const detailsBreakdown = `👥 ${count} passenger(s) @ ${selected.rate} SAR each = ${totalRate} SAR\n   🚗 Transport Included (${selected.range})`;
 
       updateSession(phone, {
-        step: 'AWAIT_PASSPORT',
+        step: 'CONFIRM_RATE_AND_PASSENGERS',
         passengerCount: count,
         currentPassengerIndex: 1,
         perPersonRate: selected.rate,
         finalVisaRate: totalRate,
-        agreedToRate: true,
         visaLabel: `Visa WITH Transport (${selected.range})`
       });
 
-      return msg.requestPassportImage(1, count);
+      const exchangeInfo = await getEffectiveExchangeRate();
+      return msg.rateConfirmation(totalRate, detailsBreakdown, exchangeInfo);
     }
     return msg.visaWithTransportPassengerMenu();
   }
@@ -78,55 +80,33 @@ async function handleVisaFlow(phone, session, incomingMsg, mediaUrl) {
   if (session.step === 'WITHOUT_TRANSPORT_AIRLINE') {
     const airlineLower = (incomingMsg || '').trim().toLowerCase();
     const isPakistani  = PAKISTANI_AIRLINES.some(pa => airlineLower.includes(pa));
-
-    updateSession(phone, {
-      step: 'WITHOUT_TRANSPORT_HAJJ_CHECK',
-      airline: incomingMsg.trim(),
-      isPakistaniAirline: isPakistani,
-      baseVisaRate: 550,
-    });
-
-    return msg.hajjTerminalQuestion(550);
-  }
-
-  // ── STEP: Hajj Terminal Surcharge Check ────────────────────
-  if (session.step === 'WITHOUT_TRANSPORT_HAJJ_CHECK') {
-    const HAJJ_SURCHARGE = 90;
-    const isHajj = text === 'YES';
-    let currentRate = 550;
-    if (isHajj && session.isPakistaniAirline) {
-      currentRate += HAJJ_SURCHARGE;
-    } else if (isHajj) {
-      currentRate += HAJJ_SURCHARGE;
-    }
+    const hajjParkingFee = isPakistani ? 90 : 0;
 
     updateSession(phone, {
       step: 'WITHOUT_TRANSPORT_FIRST_LEG_ROUTE',
-      isHajjTerminal: isHajj,
-      perPersonRate: currentRate,
+      airline: incomingMsg.trim(),
+      isPakistaniAirline: isPakistani,
+      isHajjTerminal: isPakistani,
+      hajjParkingFee: hajjParkingFee,
+      perPersonRate: 550,
+      baseVisaRate: 550,
     });
 
-    return msg.firstLegRouteMenu(currentRate);
+    return msg.firstLegRouteMenu(550, session.arrivalAirport);
   }
 
   // ── STEP: First Leg Transport Route Choice ────────────────
   if (session.step === 'WITHOUT_TRANSPORT_FIRST_LEG_ROUTE') {
-    const routeMap = {
+    const isMadinah = (session.arrivalAirport || '').toUpperCase().includes('MADINAH') || (session.arrivalAirport || '').toUpperCase().includes('MED');
+
+    const routeMap = isMadinah ? {
+      '1': { id: 7, label: 'Madinah Airport → Madinah Hotel' },
+      '2': { id: 3, label: 'Madinah Airport → Makkah Hotel' },
+    } : {
       '1': { id: 2, label: 'Jeddah Airport → Makkah Hotel' },
       '2': { id: 8, label: 'Jeddah Airport → Jeddah City' },
       '3': { id: 4, label: 'Jeddah Airport → Madinah Hotel' },
-      '4': { id: 7, label: 'Madinah Airport → Madinah Hotel' },
-      '5': { id: 3, label: 'Madinah Airport → Makkah Hotel' },
     };
-
-    if (text === '6') {
-      updateSession(phone, {
-        step: 'ASK_PASSENGERS',
-        addFirstLeg: false,
-        visaLabel: `Visa WITHOUT Transport (${session.isHajjTerminal ? 'Hajj Terminal' : 'Standard'})`
-      });
-      return msg.passengerCountPrompt(`Visa WITHOUT Transport (${session.perPersonRate} SAR/person)`);
-    }
 
     if (routeMap[text]) {
       const selected = routeMap[text];
@@ -143,7 +123,7 @@ async function handleVisaFlow(phone, session, incomingMsg, mediaUrl) {
       return msg.vehicleSelectionMenu(selected.label, routeObj.rates);
     }
 
-    return msg.firstLegRouteMenu(session.perPersonRate);
+    return msg.firstLegRouteMenu(550, session.arrivalAirport);
   }
 
   // ── STEP: First Leg Transport Vehicle Choice ───────────────
@@ -160,18 +140,16 @@ async function handleVisaFlow(phone, session, incomingMsg, mediaUrl) {
     if (vehicleKeyMap[text]) {
       const vehicle = vehicleKeyMap[text];
       const vehicleCost = session.routeRates[vehicle.key] || 0;
-      const totalPerPerson = session.perPersonRate + vehicleCost;
 
       updateSession(phone, {
         step: 'ASK_PASSENGERS',
         selectedVehicleKey: vehicle.key,
         selectedVehicleLabel: vehicle.label,
         vehicleCost: vehicleCost,
-        perPersonRate: totalPerPerson,
         visaLabel: `Visa WITHOUT Transport (${session.selectedRouteLabel} - ${vehicle.label})`
       });
 
-      return msg.passengerCountPrompt(`Visa WITHOUT Transport (${totalPerPerson} SAR/person)`);
+      return msg.passengerCountPrompt(`Visa WITHOUT Transport (550 SAR/person)`);
     }
 
     return msg.vehicleSelectionMenu(session.selectedRouteLabel, session.routeRates);
@@ -184,20 +162,29 @@ async function handleVisaFlow(phone, session, incomingMsg, mediaUrl) {
       return `⚠️ Please enter a valid number of passengers (e.g. *1*, *2*, *3*, etc.):`;
     }
 
-    const perPerson = session.perPersonRate || 650;
-    const totalRate = perPerson * count;
+    const perPerson = session.perPersonRate || 600;
+    const visaSubtotal = perPerson * count;
+    const vehicleCost = session.addFirstLeg ? (session.vehicleCost || 0) : 0;
+    const hajjParkingFee = session.hajjParkingFee || 0;
+    const grandTotal = visaSubtotal + vehicleCost + hajjParkingFee;
+
+    let detailsBreakdown = `👥 ${count} passenger(s) @ ${perPerson} SAR each = ${visaSubtotal} SAR`;
+    if (session.addFirstLeg && vehicleCost > 0) {
+      detailsBreakdown += `\n   🚗 1st Leg Transport (${session.selectedRouteLabel} - ${session.selectedVehicleLabel}): +${vehicleCost} SAR`;
+    }
+    if (hajjParkingFee > 0) {
+      detailsBreakdown += `\n   🅿️ Hajj Terminal Fixed Car Parking Fee: +90 SAR`;
+    }
 
     updateSession(phone, {
       step: 'CONFIRM_RATE_AND_PASSENGERS',
       passengerCount: count,
       currentPassengerIndex: 1,
-      finalVisaRate: totalRate,
+      finalVisaRate: grandTotal,
     });
 
-    return msg.rateConfirmation(
-      totalRate,
-      `👥 ${count} passenger(s) @ ${perPerson} SAR each (Total: ${totalRate} SAR)`
-    );
+    const exchangeInfo = await getEffectiveExchangeRate();
+    return msg.rateConfirmation(grandTotal, detailsBreakdown, exchangeInfo);
   }
 
   // ── STEP: Confirm Rate & Passenger Count ─────────────────
@@ -242,10 +229,13 @@ async function handleVisaFlow(phone, session, incomingMsg, mediaUrl) {
     const totalCount = session.passengerCount || 1;
 
     if (text === 'YES') {
+      const cleanPhone = phone.replace(/[^0-9]/g, '');
+      const requestId = session.voucherId || cleanPhone;
+
       let confirmMsg = null;
       try {
         const passportNum = session.passportData?.passportNumber;
-        const res = await confirmPassportWithGemini(passportNum);
+        const res = await confirmPassportWithGemini(passportNum, session.passportData, cleanPhone, requestId);
         if (res && res.whatsapp_message) {
           confirmMsg = res.whatsapp_message;
         }
@@ -253,11 +243,39 @@ async function handleVisaFlow(phone, session, incomingMsg, mediaUrl) {
         console.error('[VisaFlow] Gemini Confirmation error:', err.message);
       }
 
-      // Record scanned passport number and image hash into session lists
+      // Store confirmed passport media object and disk path in session list
+      const mediaList = session.passportMediaList || [];
+      if (session.pendingMediaData) {
+        mediaList.push(session.pendingMediaData);
+      }
+      const savedPaths = session.savedPassportPaths || [];
+      if (session.pendingImagePath && !savedPaths.includes(session.pendingImagePath)) {
+        savedPaths.push(session.pendingImagePath);
+      }
+
+      // Record scanned passport number, image hash, and full passenger details
       const currentScanned = session.scannedPassportNumbers || [];
       const currentHashes = session.uploadedImageHashes || [];
-      if (session.passportData?.passportNumber) {
-        currentScanned.push(session.passportData.passportNumber.toUpperCase());
+      const currentPassengers = session.passengers || [];
+
+      if (session.passportData) {
+        const { getPassengerTypeFromDob } = require('../utils/passengerAge');
+        const typeInfo = getPassengerTypeFromDob(session.passportData.dob, session.departureDate);
+
+        if (session.passportData.passportNumber) {
+          currentScanned.push(session.passportData.passportNumber.toUpperCase());
+        }
+        currentPassengers.push({
+          firstName: session.passportData.firstName || 'Passenger',
+          lastName: session.passportData.lastName || '',
+          passportNumber: (session.passportData.passportNumber || 'N/A').toUpperCase(),
+          nationality: session.passportData.nationality || 'Pakistani',
+          expiryDate: session.passportData.expiryDate || 'N/A',
+          dob: session.passportData.dob || 'N/A',
+          age: typeInfo.age,
+          passengerType: typeInfo.type,
+          passengerTypeLabel: typeInfo.label
+        });
       }
       if (session.pendingImageHash) {
         currentHashes.push(session.pendingImageHash);
@@ -270,6 +288,9 @@ async function handleVisaFlow(phone, session, incomingMsg, mediaUrl) {
           currentPassengerIndex: nextIndex,
           scannedPassportNumbers: currentScanned,
           uploadedImageHashes: currentHashes,
+          passportMediaList: mediaList,
+          savedPassportPaths: savedPaths,
+          passengers: currentPassengers
         });
 
         const progressMsg = `✅ *Passport ${currIndex} of ${totalCount} Confirmed & Recorded!*`;
@@ -277,15 +298,51 @@ async function handleVisaFlow(phone, session, incomingMsg, mediaUrl) {
         return [progressMsg, nextPrompt];
       } else {
         // All passengers confirmed!
+        const familyHead = currentPassengers[0]
+          ? `${currentPassengers[0].firstName || ''} ${currentPassengers[0].lastName || ''}`.trim()
+          : 'Valued Customer';
+
+        const isPackage = session.flow?.startsWith('PACKAGE');
+        const exchangeInfo = await getEffectiveExchangeRate();
+
+        let totalSar = session.totalSar;
+        let totalPkr = session.totalPkr;
+
+        if (!isPackage) {
+          // Calculate Visa subtotal with Infant rule (Infant < 2 yrs = 500 SAR)
+          const baseAdultRate = session.perPersonRate || 600;
+          let visaSubtotal = 0;
+          currentPassengers.forEach(p => {
+            if (p.passengerType === 'INF') {
+              visaSubtotal += 500; // Infant Visa Rate = 500 SAR
+            } else {
+              visaSubtotal += baseAdultRate;
+            }
+          });
+
+          const vehicleCost = session.addFirstLeg ? (session.vehicleCost || 0) : 0;
+          const hajjParkingFee = session.hajjParkingFee || 0;
+          totalSar = visaSubtotal + vehicleCost + hajjParkingFee;
+          totalPkr = exchangeInfo.convertToPkr(totalSar).toLocaleString();
+        }
+
         updateSession(phone, {
-          step: 'PAYMENT',
+          step: 'AWAIT_PAYMENT_RECEIPT',
+          status: 'PAYMENT PENDING',
           passportConfirmed: true,
           scannedPassportNumbers: currentScanned,
           uploadedImageHashes: currentHashes,
+          passportMediaList: mediaList,
+          savedPassportPaths: savedPaths,
+          passengers: currentPassengers,
+          familyHeadName: familyHead,
+          totalSar: totalSar,
+          effectiveRate: exchangeInfo.effectiveRate,
+          totalPkr: totalPkr
         });
-        const allDoneMsg = `✅ *Passport ${currIndex} of ${totalCount} Confirmed & Recorded!*\n\n🎉 *All ${totalCount} passport(s) have been verified and sent forward!*`;
-        const paymentMsg = msg.paymentDetails(session.finalVisaRate);
-        return [allDoneMsg, paymentMsg];
+
+        const allDoneMsg = `✅ *Passport ${currIndex} of ${totalCount} Confirmed & Recorded!*\n\n🎉 *All ${totalCount} passport(s) have been verified for ${familyHead}!*`;
+        return allDoneMsg;
       }
     }
     if (text === 'NO') {

@@ -49,6 +49,10 @@ async function extractTicketData(mediaData) {
       return {
         isValid: true,
         departureDate: result.departure_date,
+        returnDate: result.return_date,
+        travelPeriod: result.travel_period,
+        flightRoute: result.flight_route,
+        arrivalAirport: result.arrival_airport,
         formattedDate: result.formatted_date,
         message: result.whatsapp_message
       };

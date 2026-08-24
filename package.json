@@ -5,6 +5,9 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
+    "start:eyries": "cmd /c \"set CLIENT_ID=default&& node src/index.js\"",
+    "start:masarat": "cmd /c \"set CLIENT_ID=masarat_group&& node src/index.js\"",
+    "start:six_sigma": "cmd /c \"set CLIENT_ID=six_sigma&& node src/index.js\"",
     "dev": "nodemon src/index.js"
   },
   "dependencies": {

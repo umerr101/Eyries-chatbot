@@ -1,0 +1,248 @@
+{
+  "clientId": "masarat_group",
+  "agencyName": "Masarat Group (Umrah-Hajj-Hotels)",
+  "adminPhone": "923405228603@c.us",
+  "geminiApiKey": "",
+  "logoPath": "assets/masarat_logo.png",
+  "currency": "SAR",
+  "visaRates": {
+    "longStay": 600,
+    "visaWithoutTransportBase": 550,
+    "hajjTerminalSurcharge": 90,
+    "withTransport": {
+      "passengers": [
+        {
+          "range": "5-47 passengers",
+          "rate": 610
+        },
+        {
+          "range": "4 passengers",
+          "rate": 665
+        },
+        {
+          "range": "3 passengers",
+          "rate": 785
+        },
+        {
+          "range": "2 passengers",
+          "rate": 735
+        },
+        {
+          "range": "1 passenger",
+          "rate": 825
+        }
+      ],
+      "infantRate": 490
+    }
+  },
+  "ziaratRates": {
+    "makkahZiarat": 12,
+    "madinahZiarat": 12
+  },
+  "makkahHotels": [
+    {
+      "id": 1,
+      "name": "Masarat Masmara",
+      "location": "Jarwal side",
+      "distance": "900-1000m",
+      "rates": {
+        "sharing": 14,
+        "quad": 18,
+        "triple": 23,
+        "double": 35,
+        "room": 70
+      }
+    },
+    {
+      "id": 2,
+      "name": "Masarat Royal / Masarat Al Taqwa (4★)",
+      "location": "Shuttle Service",
+      "distance": "Shuttle Service",
+      "rates": {
+        "sharing": 20,
+        "quad": 25,
+        "triple": 33,
+        "double": 50,
+        "room": 100
+      }
+    },
+    {
+      "id": 3,
+      "name": "Masarat Ajyad Al Masi",
+      "location": "Misfalah",
+      "distance": "900m",
+      "rates": {
+        "sharing": null,
+        "quad": 30,
+        "triple": 40,
+        "double": 60,
+        "room": 120
+      }
+    },
+    {
+      "id": 4,
+      "name": "Roza Sharook",
+      "location": "Ibrahim Khalil road",
+      "distance": "900-1000m",
+      "rates": {
+        "sharing": 28,
+        "quad": 35,
+        "triple": 47,
+        "double": 70,
+        "room": 140
+      }
+    },
+    {
+      "id": 5,
+      "name": "Masarat Khalil (Rate Revised)",
+      "location": "Ibrahim Khalil road",
+      "distance": "750m",
+      "rates": {
+        "sharing": 39,
+        "quad": 49,
+        "triple": 65,
+        "double": 98,
+        "room": 195
+      }
+    },
+    {
+      "id": 6,
+      "name": "Masarat Silver (Rate Revised)",
+      "location": "Ibrahim Khalil road",
+      "distance": "600m",
+      "rates": {
+        "sharing": 43,
+        "quad": 54,
+        "triple": 72,
+        "double": 108,
+        "room": 215
+      }
+    },
+    {
+      "id": 7,
+      "name": "Hibba Muhajreen (Ex. Majd)",
+      "location": "Hijra Road",
+      "distance": "150-250m",
+      "rates": {
+        "sharing": null,
+        "quad": 80,
+        "triple": 107,
+        "double": 160,
+        "room": 320
+      }
+    }
+  ],
+  "madinahHotels": [
+    {
+      "id": 1,
+      "name": "Abraj Diyafah",
+      "location": "Shuttle Service",
+      "distance": "Shuttle Service",
+      "rates": {
+        "sharing": 24,
+        "quad": 30,
+        "triple": 40,
+        "double": 60,
+        "room": 120
+      }
+    },
+    {
+      "id": 2,
+      "name": "Qadat Al Diyafah (3★)",
+      "location": "Shuttle Service",
+      "distance": "Shuttle Service",
+      "rates": {
+        "sharing": 30,
+        "quad": 38,
+        "triple": 50,
+        "double": 75,
+        "room": 150
+      }
+    },
+    {
+      "id": 3,
+      "name": "Masarat Majd Taiba",
+      "location": "Shumalia side",
+      "distance": "600-700m",
+      "rates": {
+        "sharing": 32,
+        "quad": 40,
+        "triple": 53,
+        "double": 80,
+        "room": 160
+      }
+    },
+    {
+      "id": 4,
+      "name": "Naseem Al Sharia",
+      "location": "Near Top Ten",
+      "distance": "650m",
+      "rates": {
+        "sharing": 36,
+        "quad": 45,
+        "triple": 60,
+        "double": 90,
+        "room": 180
+      }
+    },
+    {
+      "id": 5,
+      "name": "Zahra 2",
+      "location": "Masjid Bilal Road",
+      "distance": "400-500m",
+      "rates": {
+        "sharing": 40,
+        "quad": 50,
+        "triple": 67,
+        "double": 100,
+        "room": 200
+      }
+    },
+    {
+      "id": 6,
+      "name": "Fundaq Issa Kareem",
+      "location": "Qurban Road",
+      "distance": "400-500m",
+      "rates": {
+        "sharing": 46,
+        "quad": 58,
+        "triple": 77,
+        "double": 115,
+        "room": 230
+      }
+    },
+    {
+      "id": 7,
+      "name": "Taiba Rose / Najoom Al Madinah",
+      "location": "Markazia",
+      "distance": "150m",
+      "rates": {
+        "sharing": 70,
+        "quad": 88,
+        "triple": 117,
+        "double": 175,
+        "room": 350
+      }
+    },
+    {
+      "id": 8,
+      "name": "Rua Al Fakhama / Arjwan Rose",
+      "location": "Markazia",
+      "distance": "50m",
+      "rates": {
+        "sharing": 70,
+        "quad": 88,
+        "triple": 117,
+        "double": 175,
+        "room": 350
+      }
+    }
+  ],
+  "bankDetails": {
+    "bankName": "Meezan Bank Ltd",
+    "accountTitle": "Masarat Group",
+    "accountNumber": "0123456789012345",
+    "iban": "PK36MEZN0001230123456789",
+    "branch": "Lahore Office"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "clientId": "agency_template",
+  "agencyName": "Your Travel Agency Name",
+  "adminPhone": "923XXXXXXXXX@c.us",
+  "geminiApiKey": "",
+  "currency": "SAR",
+  "visaRates": {
+    "longStay": 600,
+    "visaWithoutTransportBase": 550,
+    "hajjTerminalSurcharge": 90,
+    "withTransport": {
+      "passengers": [
+        { "range": "5-47 passengers", "rate": 600 },
+        { "range": "4 passengers", "rate": 650 },
+        { "range": "3 passengers", "rate": 675 },
+        { "range": "2 passengers", "rate": 725 },
+        { "range": "1 passenger", "rate": 790 }
+      ]
+    }
+  },
+  "bankDetails": {
+    "bankName": "Bank Name",
+    "accountTitle": "Account Title",
+    "accountNumber": "Account Number",
+    "iban": "IBAN Number",
+    "branch": "Branch Name"
+  }
+}

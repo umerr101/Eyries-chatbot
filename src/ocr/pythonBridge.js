@@ -10,12 +10,18 @@ const os           = require('os');
 const SCRIPT_PATH  = path.resolve(__dirname, '..', '..', 'passport_ocr_master.py');
 const PYTHON_CMD   = process.env.PYTHON_CMD || 'python';
 
+const { AGENCY }    = require('../config');
+
 /**
  * Runs Python script asynchronously with argument array and returns parsed JSON.
  */
 function runPython(args) {
   return new Promise((resolve, reject) => {
-    execFile(PYTHON_CMD, [SCRIPT_PATH, ...args], { maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+    const customEnv = { ...process.env };
+    if (AGENCY && AGENCY.geminiApiKey) {
+      customEnv.CLIENT_GEMINI_KEY = AGENCY.geminiApiKey;
+    }
+    execFile(PYTHON_CMD, [SCRIPT_PATH, ...args], { maxBuffer: 10 * 1024 * 1024, env: customEnv }, (error, stdout, stderr) => {
       if (stderr) {
         console.warn('[PythonBridge stderr]:', stderr);
       }
@@ -73,7 +79,10 @@ async function processTicketWithGemini(mediaData) {
     throw new Error('No media data provided for Ticket OCR');
   }
 
-  const ext = (mediaData.mimetype || 'image/jpeg').split('/')[1]?.split(';')[0] || 'jpg';
+  let ext = (mediaData.mimetype || 'image/jpeg').split('/')[1]?.split(';')[0] || 'jpg';
+  if ((mediaData.mimetype && mediaData.mimetype.includes('pdf')) || (mediaData.filename && mediaData.filename.endsWith('.pdf'))) {
+    ext = 'pdf';
+  }
   const tmpPath = path.join(os.tmpdir(), `ticket_${Date.now()}.${ext}`);
 
   try {
@@ -93,10 +102,38 @@ async function processTicketWithGemini(mediaData) {
 /**
  * Confirms record, translates to Arabic script, updates passports.db, and exports Master_Passports.xlsx.
  */
-async function confirmPassportWithGemini(passportNumber, englishData = null) {
+async function confirmPassportWithGemini(passportNumber, englishData = null, phone = '', requestId = '') {
   const args = ['confirm', passportNumber];
   if (englishData) {
     args.push(JSON.stringify(englishData));
+  } else {
+    args.push('{}');
+  }
+  if (phone) {
+    args.push(String(phone));
+  } else {
+    args.push('');
+  }
+  if (requestId) {
+    args.push(String(requestId));
+  } else {
+    args.push('');
+  }
+  return await runPython(args);
+}
+
+/**
+ * Generates an isolated Master_Passports.xlsx file containing ONLY the passports for the given request ID / order window.
+ */
+async function exportExcelForWindow(requestIdOrPhone = null, passengersList = null) {
+  const args = ['export_excel'];
+  if (requestIdOrPhone) {
+    args.push(String(requestIdOrPhone));
+  } else {
+    args.push('ALL');
+  }
+  if (passengersList && Array.isArray(passengersList) && passengersList.length > 0) {
+    args.push(JSON.stringify(passengersList));
   }
   return await runPython(args);
 }
@@ -105,4 +142,5 @@ module.exports = {
   processPassportWithGemini,
   processTicketWithGemini,
   confirmPassportWithGemini,
+  exportExcelForWindow,
 };

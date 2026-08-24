@@ -30,6 +30,11 @@ function saveSessions(store) {
 
 let store = loadSessions();
 
+// Ensure orders sub-store exists
+if (!store._orders) {
+  store._orders = {};
+}
+
 const db = {
   exec: () => {}, // Compatibility stub
   prepare: (sql) => {
@@ -48,6 +53,21 @@ const db = {
         }
         return undefined;
       },
+      all: (...args) => {
+        if (upper.includes('SELECT')) {
+          const rows = [];
+          for (const [phone, sess] of Object.entries(store)) {
+            if (phone.startsWith('_')) continue;
+            rows.push({
+              phone,
+              data: sess.data,
+              last_activity: sess.last_activity
+            });
+          }
+          return rows;
+        }
+        return [];
+      },
       run: (...args) => {
         if (upper.includes('INSERT') || upper.includes('UPDATE')) {
           const [phone, data, last_activity] = args;
@@ -59,6 +79,7 @@ const db = {
           const cutoff = args[0];
           let changes = 0;
           for (const key of Object.keys(store)) {
+            if (key.startsWith('_')) continue;
             if (store[key].last_activity < cutoff) {
               delete store[key];
               changes++;
@@ -70,6 +91,60 @@ const db = {
         return { changes: 0 };
       }
     };
+  },
+
+  // ── Persistent Booking Orders API ──────────────────────────
+  saveOrder: (voucherId, customerPhone, sessionData, status = 'PAYMENT PENDING') => {
+    if (!voucherId) return;
+    store._orders[voucherId] = {
+      voucherId,
+      customerPhone,
+      status,
+      sessionData: JSON.parse(JSON.stringify(sessionData || {})),
+      createdAt: store._orders[voucherId]?.createdAt || Date.now(),
+      lastUpdated: Date.now()
+    };
+    saveSessions(store);
+  },
+
+  getOrder: (voucherId) => {
+    if (!voucherId) return null;
+    const vIdUpper = voucherId.toUpperCase().trim();
+    for (const [id, order] of Object.entries(store._orders || {})) {
+      if (id.toUpperCase().trim() === vIdUpper) {
+        return order;
+      }
+    }
+    return null;
+  },
+
+  getLatestPendingOrder: (customerPhone) => {
+    if (!customerPhone) return null;
+    const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
+    let latest = null;
+
+    for (const order of Object.values(store._orders || {})) {
+      const orderPhone = (order.customerPhone || '').replace(/[^0-9]/g, '');
+      const isPhoneMatch = (cleanPhone && orderPhone && (cleanPhone.endsWith(orderPhone) || orderPhone.endsWith(cleanPhone)));
+      const isPending = (order.status || '').toUpperCase().includes('PENDING');
+
+      if (isPhoneMatch && isPending) {
+        if (!latest || order.lastUpdated > latest.lastUpdated) {
+          latest = order;
+        }
+      }
+    }
+    return latest;
+  },
+
+  updateOrderStatus: (voucherId, newStatus, extraData = {}) => {
+    const order = db.getOrder(voucherId);
+    if (!order) return false;
+    order.status = newStatus;
+    order.lastUpdated = Date.now();
+    Object.assign(order.sessionData, extraData);
+    saveSessions(store);
+    return true;
   }
 };
 

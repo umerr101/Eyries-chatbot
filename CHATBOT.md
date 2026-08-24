@@ -2,13 +2,13 @@
 
 
 
-Visa Rates: --> Long stay (80 days) = 650 Saudi riyal
+Visa Rates: --> Long stay (80 days) = 600 Saudi riyal
 
 	Requirements : 1. Confirm Ticket
 
-		       2. Iqama + Saudi address
+		       	   2. Iqama + Saudi address
 
-		       3. Clear passport copy
+    		       3. Clear passport copy
 
 
 
@@ -38,13 +38,11 @@ Visa Rates: --> Long stay (80 days) = 650 Saudi riyal
 
 		5. 790 Saudi riyal(1 passenger)
 
-	requirements: hotel booking
+	requirements: ticket booking
 
 
 
 	Only visa without transport (30 days max) --> 550 riyal
-			
-		90 riyal for any Pakistani airline (640 riyal)
 
 		With first leg transport (transport rates from rate card):
 
@@ -79,6 +77,6 @@ Above are the rates and requirements mentioned for both visa and transport menti
 
 For a visa query if the customer agrees with the rate the bot should ask the customer to send a clear passport picture. After that, connect an OCR that extracts the following passport details: 1. First Name, 2. Last Name, 3. Passport Number, 4. Issue Date, 5. Expiry Date. The first name and last name should also be translated in Arabic in the message. The message should be sent to the customer to confirm if the details extracted are correct. After it is confirmed, the payment method should be displayed to the customer i.e. bank account or cash. Tell the customer that visa will be processed once payment is cleared. Once payment is done, give the user wait time of 1-2 days for visa processing. Tell him he will receive his visa in a day or two.
 
-Any Pakistani airline flying to Jeddah hajj terminal will be charged extra 90 Saudi riyals along with the visa rate. when 1st leg transport from Jeddah/Madina airport to anywhere(which is mentioned in transport rates card) will be added the user should get the option for which kind of transport he wants. Then upon selection of vehicle type, the final visa rate should be adjusted i.e visa rate + 90 riyal(if arriving on hajj terminal) + vehicle cost. On any other airline no 90 Saudi riyals extra will be charged however 1st leg transport from Jeddah/madina airport to anywhere(which is mentioned in transport rates card) is applicable. This rule only applies if visa without transport is selected. following are the vehicle capacity: Sedan (3-4), GMC (6), Staria (6), Hiace (9), Coaster (17), Bus (47).
+Any Pakistani airline flying to Jeddah hajj terminal will be charged extra 90 Saudi riyals along with the visa rate.No matter how many passports a customer send this 90 riyal applies to vehicle only, not the individual visa(this 90 riyals are actually parking fees for a car). When 1st leg transport from Jeddah/Madina airport to anywhere(which is mentioned in transport rates card) will be added the user should get the option for which kind of transport he wants. Then upon selection of vehicle type, the final visa rate should be adjusted i.e. visa rate + 90 riyal-fixed car parking fee(if arriving on hajj terminal) + vehicle cost. On any other airline no 90 Saudi riyals extra will be charged as the car will not be parked. However, 1st leg transport from Jeddah/madina airport to anywhere(which is mentioned in transport rates card) is applicable. This rule only applies if visa without transport is selected. following are the vehicle capacity: Sedan (3-4), GMC (6), Staria (6), Hiace (9), Coaster (17), Bus (47).
 
 In the visa section, when customer confirms number of passengers and is about to upload passport pictures, before doing so ask him for a picture of ticket booking. Check if travel dates are valid (a future date and is less than 30 days for a visa with/without transport). Once validated, then continue with the passport picture process.

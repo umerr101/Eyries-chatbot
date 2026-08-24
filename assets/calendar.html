@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Select Stay Dates — Hajj & Umrah Hotel Booking</title>
+  <!-- Flatpickr CSS for sleek calendar UI -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+    }
+    .card {
+      background: rgba(30, 41, 59, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 24px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+    .header { text-align: center; margin-bottom: 20px; }
+    .header h1 { font-size: 1.25rem; font-weight: 700; color: #38bdf8; margin-bottom: 6px; }
+    .header p { font-size: 0.875rem; color: #94a3b8; }
+    .date-summary {
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .date-box { text-align: center; }
+    .date-box span { display: block; font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .date-box strong { font-size: 0.95rem; color: #f1f5f9; }
+    .nights-badge {
+      grid-column: span 2;
+      text-align: center;
+      padding-top: 8px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.1);
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #4ade80;
+    }
+    .calendar-container { margin-bottom: 24px; display: flex; justify-content: center; }
+    .flatpickr-calendar { background: #0f172a !important; border: 1px solid rgba(255,255,255,0.1) !important; box-shadow: none !important; border-radius: 14px !important; }
+    .btn-confirm {
+      width: 100%;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      border: none;
+      border-radius: 12px;
+      padding: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+    }
+    .btn-confirm:active { transform: scale(0.98); }
+    .btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+    .success-screen { text-align: center; padding: 20px 0; display: none; }
+    .success-screen h2 { color: #4ade80; font-size: 1.4rem; margin-bottom: 10px; }
+    .success-screen p { color: #cbd5e1; font-size: 0.95rem; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <div id="bookingForm">
+      <div class="header">
+        <h1 id="cityHeader">🗓️ Select Stay Dates</h1>
+        <p id="hotelSubheader">Choose Check-in and Check-out dates</p>
+      </div>
+
+      <div class="date-summary">
+        <div class="date-box">
+          <span>Check-in</span>
+          <strong id="checkInDisplay">Select Date</strong>
+        </div>
+        <div class="date-box">
+          <span>Check-out</span>
+          <strong id="checkOutDisplay">Select Date</strong>
+        </div>
+        <div class="nights-badge" id="nightsDisplay">🌙 0 Nights Selected</div>
+      </div>
+
+      <div class="calendar-container">
+        <input type="text" id="inlinePicker" style="display:none;">
+      </div>
+
+      <button id="btnConfirm" class="btn-confirm" disabled>Confirm & Save Dates</button>
+    </div>
+
+    <div id="successScreen" class="success-screen">
+      <h2>🎉 Dates Confirmed!</h2>
+      <p id="successMessage">Your stay dates have been saved and synced to your WhatsApp booking session.</p>
+      <p style="font-size:0.8rem; color:#94a3b8;">You may close this tab and return to WhatsApp.</p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script>
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    const pathToken = (pathParts.length >= 2 && (pathParts[0] === 'c' || pathParts[0] === 'calendar')) ? pathParts[1] : null;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = pathToken || urlParams.get('t') || urlParams.get('token') || '';
+    const phone = urlParams.get('p') || urlParams.get('phone') || '';
+    const city = (urlParams.get('c') || urlParams.get('city') || 'MAKKAH').toUpperCase();
+
+    document.getElementById('cityHeader').innerText = `🗓️ ${city} Stay Dates`;
+
+    let selectedCheckIn = null;
+    let selectedCheckOut = null;
+    let selectedNights = 0;
+
+    const fp = flatpickr("#inlinePicker", {
+      inline: true,
+      mode: "range",
+      minDate: "today",
+      dateFormat: "Y-m-d",
+      onChange: function(selectedDates) {
+        if (selectedDates.length === 2) {
+          selectedCheckIn = selectedDates[0];
+          selectedCheckOut = selectedDates[1];
+          const diffTime = Math.abs(selectedCheckOut - selectedCheckIn);
+          selectedNights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          const options = { day: '2-digit', month: 'short', year: 'numeric' };
+          document.getElementById('checkInDisplay').innerText = selectedCheckIn.toLocaleDateString('en-GB', options);
+          document.getElementById('checkOutDisplay').innerText = selectedCheckOut.toLocaleDateString('en-GB', options);
+          document.getElementById('nightsDisplay').innerText = `🌙 ${selectedNights} Night(s) Selected`;
+          document.getElementById('btnConfirm').disabled = false;
+        } else {
+          document.getElementById('checkInDisplay').innerText = selectedDates[0] ? selectedDates[0].toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : 'Select Date';
+          document.getElementById('checkOutDisplay').innerText = 'Select Date';
+          document.getElementById('nightsDisplay').innerText = '🌙 Select Check-out Date';
+          document.getElementById('btnConfirm').disabled = true;
+        }
+      }
+    });
+
+    document.getElementById('btnConfirm').addEventListener('click', async () => {
+      if (!selectedCheckIn || !selectedCheckOut || selectedNights < 1) return;
+
+      const btn = document.getElementById('btnConfirm');
+      btn.disabled = true;
+      btn.innerText = 'Saving Dates...';
+
+      const formatIso = (dt) => dt.toISOString().split('T')[0];
+      const formatPretty = (dt) => dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+      try {
+        const response = await fetch('/api/calendar-save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: token,
+            phone: phone,
+            city: city,
+            checkInRaw: formatIso(selectedCheckIn),
+            checkOutRaw: formatIso(selectedCheckOut),
+            checkInPretty: formatPretty(selectedCheckIn),
+            checkOutPretty: formatPretty(selectedCheckOut),
+            nights: selectedNights
+          })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          document.getElementById('bookingForm').style.display = 'none';
+          document.getElementById('successScreen').style.display = 'block';
+          document.getElementById('successMessage').innerText = `Check-in: ${formatPretty(selectedCheckIn)} | Check-out: ${formatPretty(selectedCheckOut)} (${selectedNights} Nights)`;
+        } else {
+          alert(data.error || 'Could not save dates. Please try again.');
+          btn.disabled = false;
+          btn.innerText = 'Confirm & Save Dates';
+        }
+      } catch (err) {
+        alert('Connection error: ' + err.message);
+        btn.disabled = false;
+        btn.innerText = 'Confirm & Save Dates';
+      }
+    });
+  </script>
+</body>
+</html>

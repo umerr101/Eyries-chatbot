@@ -1,22 +1,35 @@
 // ============================================================
-//  config.js — All business data & configurable constants
+//  config.js — Dynamic Multi-Client SaaS Configuration
 // ============================================================
 
 require('dotenv').config();
+const { loadClientConfig } = require('./configLoader');
+
+// Load active client configuration
+const activeClient = loadClientConfig();
 
 // ─── Contact Numbers ─────────────────────────────────────────
 const CONTACTS = {
-  helpline: process.env.HELPLINE_WHATSAPP || '+923180978480',
-  ticketing: process.env.TICKETING_WHATSAPP || '+923180978480',
+  helpline: process.env.HELPLINE_WHATSAPP || activeClient.adminPhone || '+923180978480',
+  ticketing: process.env.TICKETING_WHATSAPP || activeClient.adminPhone || '+923180978480',
+  adminPhone: activeClient.adminPhone || '923180978480@c.us',
 };
 
 // ─── Payment Details ─────────────────────────────────────────
 const PAYMENT = {
-  bankName:      process.env.BANK_NAME       || 'Meezan Bank Ltd',
-  accountTitle:  process.env.ACCOUNT_TITLE   || 'Eyries Holidays',
-  accountNumber: process.env.ACCOUNT_NUMBER  || '0123456789012345',
-  iban:          process.env.IBAN            || 'PK36MEZN0001230123456789',
-  branch:        process.env.BANK_BRANCH     || 'Head Office, Islamabad',
+  bankName:      activeClient.bankDetails?.bankName      || process.env.BANK_NAME      || 'Meezan Bank Ltd',
+  accountTitle:  activeClient.bankDetails?.accountTitle  || process.env.ACCOUNT_TITLE  || 'Eyries Holidays',
+  accountNumber: activeClient.bankDetails?.accountNumber || process.env.ACCOUNT_NUMBER || '0123456789012345',
+  iban:          activeClient.bankDetails?.iban          || process.env.IBAN           || 'PK36MEZN0001230123456789',
+  branch:        activeClient.bankDetails?.branch        || process.env.BANK_BRANCH    || 'Head Office, Islamabad',
+};
+
+// ─── Agency Branding ─────────────────────────────────────────
+const AGENCY = {
+  name: activeClient.agencyName || 'Eyries Holidays',
+  currency: activeClient.currency || 'SAR',
+  geminiApiKey: activeClient.geminiApiKey || '',
+  logoPath: activeClient.logoPath || 'assets/eyries_logo.png',
 };
 
 // ─── Pakistani Airlines (attract +90 SAR surcharge) ──────────
@@ -29,7 +42,7 @@ const PAKISTANI_AIRLINES = [
 const VISA_RATES = {
   longStay: {
     label: 'Long Stay Visa (up to 80 days)',
-    rate: 650,
+    rate: activeClient.visaRates?.longStay || 600,
     requirements: [
       'Confirmed airline ticket',
       'Iqama + Saudi address',
@@ -39,22 +52,18 @@ const VISA_RATES = {
   withTransport: {
     label: 'Visa WITH Transport Package (max 30 days)',
     requirement: 'Hotel booking required',
-    passengers: [
+    passengers: activeClient.visaRates?.withTransport?.passengers || [
       { range: '5–47 passengers', rate: 600 },
       { range: '4 passengers',    rate: 650 },
       { range: '3 passengers',    rate: 675 },
-      { range: '2 passengers',    rate: 700 },
+      { range: '2 passengers',    rate: 725 },
       { range: '1 passenger',     rate: 790 },
     ],
   },
   withoutTransport: {
     label: 'Visa WITHOUT Transport (max 30 days)',
-    baseRate: 550,
-    pakistaniAirlineSurcharge: 90,  // +90 SAR for Pakistani airlines
-    firstLegTransport: {
-      jeddahToMakkah:     { label: 'Jeddah Airport → Makkah Hotel',   rate: 900 },
-      jeddahToJeddahCity: { label: 'Jeddah Airport → Jeddah City',    rate: 820 },
-    },
+    baseRate: activeClient.visaRates?.visaWithoutTransportBase || 550,
+    pakistaniAirlineSurcharge: activeClient.visaRates?.hajjTerminalSurcharge || 90,
   },
 };
 
@@ -116,4 +125,4 @@ const VEHICLES = [
   { id: 6, key: 'bus47',         label: 'Bus (47 Seats)', capacity: '47 passengers' },
 ];
 
-module.exports = { CONTACTS, PAYMENT, PAKISTANI_AIRLINES, VISA_RATES, TRANSPORT_ROUTES, VEHICLES };
+module.exports = { CONTACTS, PAYMENT, AGENCY, PAKISTANI_AIRLINES, VISA_RATES, TRANSPORT_ROUTES, VEHICLES, activeClient };
