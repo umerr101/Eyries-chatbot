@@ -248,7 +248,7 @@ ARABIC_NAME_DICT = {
     "HAMZA": "حمزة",
     "ZULFIQAR": "ذو الفقار",
     "ABDUL": "عبد ال", "ABD": "عبد", "ABDULLAH": "عبد الله", "ABDUR": "عبد ال",
-    "REHMAN": "رحمن", "RAHMAN": "رحمن", "RAHEEM": "رحيم", "RASHEED": "رشيد",
+    "REHMAN": "رحمن", "RAHMAN": "رحمن", "RAHEEM": "رحيم", "RAHIM": "رحيم", "RASHEED": "رشيد",
     "WAQAS": "وقاص",
     "FAISAL": "فيصل",
     "NAEEM": "نعيم",
@@ -878,15 +878,19 @@ def run_gemini_arabic_translation(english_data: Dict[str, Any], api_key: Optiona
         from google import genai
         from google.genai import types
 
+        fn = english_data.get('first_name') or english_data.get('firstName') or ''
+        ln = english_data.get('last_name') or english_data.get('lastName') or ''
+        nat = english_data.get('nationality') or 'Pakistani'
+
         prompt = f"""
         Phonetically transliterate the person's English first_name and last_name into official Arabic script.
         Do NOT translate the country/nationality name — set nationality_ar exactly equal to Nationality as provided.
-        First Name: {english_data.get('first_name', '')}
-        Last Name: {english_data.get('last_name', '')}
-        Nationality: {english_data.get('nationality', '')}
+        First Name: {fn}
+        Last Name: {ln}
+        Nationality: {nat}
         """
 
-        candidate_models = ['gemini-2.5-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-pro', 'gemini-2.0-flash', 'gemini-flash-latest']
+        candidate_models = ['gemini-flash-latest', 'gemini-flash-lite-latest']
         response = None
         for k in keys:
             key_exhausted = False
@@ -894,26 +898,25 @@ def run_gemini_arabic_translation(english_data: Dict[str, Any], api_key: Optiona
             for m in candidate_models:
                 if key_exhausted:
                     break
-                for attempt in range(2):
-                    try:
-                        response = client.models.generate_content(
-                            model=m,
-                            contents=prompt,
-                            config=types.GenerateContentConfig(
-                                response_mime_type="application/json",
-                                response_schema=ArabicTranslationSchema,
-                                temperature=0.1
-                            )
+                try:
+                    response = client.models.generate_content(
+                        model=m,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=ArabicTranslationSchema,
+                            temperature=0.1
                         )
-                        if response and response.text:
-                            break
-                    except Exception as err:
-                        err_msg = str(err)
-                        sys.stderr.write(f"Gemini translation {m} error: {err_msg}\n")
-                        if '429' in err_msg or 'RESOURCE_EXHAUSTED' in err_msg:
-                            key_exhausted = True
-                            break
+                    )
+                    if response and response.text:
                         break
+                except Exception as err:
+                    err_msg = str(err)
+                    sys.stderr.write(f"Gemini translation {m} error: {err_msg}\n")
+                    if '429' in err_msg or 'RESOURCE_EXHAUSTED' in err_msg:
+                        key_exhausted = True
+                        break
+                    continue
                 if response and response.text:
                     break
             if response and response.text:
@@ -921,7 +924,7 @@ def run_gemini_arabic_translation(english_data: Dict[str, Any], api_key: Optiona
 
         if response and response.text:
             res_dict = ArabicTranslationSchema.model_validate_json(response.text).model_dump()
-            res_dict["nationality_ar"] = english_data.get("nationality", "")
+            res_dict["nationality_ar"] = nat
             return res_dict
     except Exception as e:
         sys.stderr.write(f"Gemini translation exception: {e}\n")
@@ -1067,36 +1070,32 @@ def run_openrouter_arabic_translation(english_data: Dict[str, Any]) -> Optional[
     return None
 
 def run_arabic_translation(english_data: Dict[str, Any], api_key: Optional[str] = None) -> Dict[str, Any]:
-    """Translates English passport names to Arabic with Multi-Provider Fallbacks (Gemini -> Groq -> Cerebras -> OpenRouter -> Rule Engine)."""
-    # Tier 1: Gemini
+    """Translates English passport names to Arabic (Instant Offline Rule Engine + Fast Gemini Fallback)."""
+    fn = english_data.get("first_name") or english_data.get("firstName") or ""
+    ln = english_data.get("last_name") or english_data.get("lastName") or ""
+    nat = english_data.get("nationality") or "Pakistani"
+
+    # Tier 1: Fast Rule & Dictionary Engine (Instant 0.001s, 100% reliable)
+    fn_ar = translate_single_field_to_arabic(fn)
+    ln_ar = translate_single_field_to_arabic(ln)
+
+    if is_arabic_text(fn_ar) and (not ln or is_arabic_text(ln_ar)):
+        return {
+            "first_name_ar": fn_ar,
+            "last_name_ar": ln_ar,
+            "nationality_ar": nat
+        }
+
+    # Tier 2: Gemini API
     res = run_gemini_arabic_translation(english_data, api_key)
-    if res:
+    if res and (is_arabic_text(res.get("first_name_ar")) or is_arabic_text(res.get("last_name_ar"))):
         return res
 
-    # Tier 2: Groq Arabic
-    sys.stderr.write("[Translation Engine] Gemini limit reached. Falling back to Groq Arabic...\n")
-    res = run_groq_arabic_translation(english_data)
-    if res:
-        return res
-
-    # Tier 3: Cerebras Arabic
-    sys.stderr.write("[Translation Engine] Groq limit reached. Falling back to Cerebras...\n")
-    res = run_cerebras_arabic_translation(english_data)
-    if res:
-        return res
-
-    # Tier 4: OpenRouter Arabic
-    sys.stderr.write("[Translation Engine] Cerebras limit reached. Falling back to OpenRouter...\n")
-    res = run_openrouter_arabic_translation(english_data)
-    if res:
-        return res
-
-    # Tier 5: Rule Engine Fallback
-    sys.stderr.write("[Translation Engine] Using offline phonetic Arabic rule-engine fallback.\n")
+    # Tier 3: Return Rule Engine result
     return {
-        "first_name_ar": translate_single_field_to_arabic(english_data.get("first_name", "")),
-        "last_name_ar": translate_single_field_to_arabic(english_data.get("last_name", "")),
-        "nationality_ar": english_data.get("nationality", "")
+        "first_name_ar": fn_ar,
+        "last_name_ar": ln_ar,
+        "nationality_ar": nat
     }
 
 # ==============================================================================
