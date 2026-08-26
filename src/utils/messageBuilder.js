@@ -5,7 +5,7 @@
 const { CONTACTS, PAYMENT, AGENCY, VISA_RATES, TRANSPORT_ROUTES, VEHICLES } = require('../config');
 
 // ── MENU footer appended to every message ────────────────────
-const MENU_FOOTER = `\n\n_Type *MENU* at any time to return to the main menu._`;
+const MENU_FOOTER = `\n\n_Reply *0* to go back | *MENU* for main menu._`;
 
 function mainMenuFooter() {
   return MENU_FOOTER;

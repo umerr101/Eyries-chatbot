@@ -11,6 +11,7 @@ const { handleVisaFlow }       = require('./flows/visaFlow');
 const { handleTransportFlow }  = require('./flows/transportFlow');
 const { handleHotelFlow }      = require('./flows/hotelFlow');
 const { handlePackageFlow }    = require('./flows/packageFlow');
+const { handleStepBack }       = require('./stepBackHandler');
 const { extractPassportData, extractTicketData }  = require('./ocr/passport');
 const msg                      = require('./utils/messageBuilder');
 
@@ -28,6 +29,11 @@ async function routeMessage(phone, body, media) {
       (text === '' && !isMediaUpload)) {
     resetSession(phone);
     return msg.mainMenu();
+  }
+
+  // ── Global Step Back Command ('0' or 'BACK') ───────────────
+  if (text === '0' || text === 'BACK' || text === 'GO BACK' || text === 'رجوع' || text === 'واپس') {
+    return handleStepBack(phone);
   }
 
   // Re-read session after any potential reset above so flow checks are accurate
