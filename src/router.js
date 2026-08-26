@@ -269,12 +269,17 @@ async function ocrAndBuildReplies(phone, mediaData) {
 
     // Save imageHash & mediaData to pending session state
     const detectedName = `${data.firstName || ''} ${data.lastName || ''}`.trim();
+    const savedPaths = (session.savedPassportPaths || []).slice();
+    if (!savedPaths.includes(filePath)) {
+      savedPaths.push(filePath);
+    }
     const updatePayload = {
       step: 'PASSPORT_CONFIRM',
       passportData: data,
       pendingImageHash: imageHash,
       pendingMediaData: mediaData,
       pendingImagePath: filePath,
+      savedPassportPaths: savedPaths,
     };
     if (currIndex === 1 && detectedName && detectedName !== 'Not detected') {
       updatePayload.familyHeadName = detectedName;

@@ -205,6 +205,188 @@ def get_record(passport_number: str) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 # ==============================================================================
+# ARABIC PHONETIC TRANSLITERATION ENGINE & DICTIONARY
+# ==============================================================================
+ARABIC_NAME_DICT = {
+    "MUHAMMAD": "محمد", "MOHAMMAD": "محمد", "MOHAMED": "محمد", "MD": "محمد", "MOHD": "محمد", "MOHMED": "محمد",
+    "AHMED": "أحمد", "AHMAD": "أحمد",
+    "ALI": "علي",
+    "KHAN": "خان",
+    "MALIK": "مالك",
+    "AKRAM": "أكرم",
+    "AKHTAR": "أختر",
+    "RAMZAN": "رمضان", "RAMADAN": "رمضان",
+    "SALEEM": "سليم", "SALIM": "سليم",
+    "GHULAM": "غلام",
+    "MURTAZA": "مرتضى", "MURTZA": "مرتضى",
+    "RABIA": "رابعة", "RABIYA": "رابعة", "RABYA": "رابعة",
+    "ANWAR": "أنور", "ANWER": "أنور",
+    "HUSSAIN": "حسين", "HUSAIN": "حسين", "HOSSAIN": "حسين",
+    "HASSAN": "حسن", "HASAN": "حسن",
+    "USMAN": "عثمان", "OTHMAN": "عثمان", "OSMAN": "عثمان",
+    "UMAR": "عمر", "OMAR": "عمر", "UMER": "عمر",
+    "ABUBAKAR": "أبو بكر", "ABU BAKR": "أبو بكر", "ABUBAKR": "أبو بكر",
+    "FATIMA": "فاطمة", "FATIMAH": "فاطمة",
+    "AYESHA": "عائشة", "AISHA": "عائشة",
+    "ZAINAB": "زينب",
+    "KHADIJA": "خديجة", "KHADIJAH": "خديجة",
+    "MARIAM": "مريم", "MARYAM": "مريم",
+    "SADIA": "سعدية",
+    "SAIMA": "صائمة",
+    "FARHANA": "فرحانة",
+    "AMNA": "آمنة",
+    "BUSHRA": "بشرى",
+    "SHAHID": "شاهد",
+    "TARIQ": "طارق",
+    "RASHID": "راشد",
+    "KHALID": "خالد",
+    "ASIF": "عاصف",
+    "ARIF": "عارف",
+    "IMRAN": "عمران",
+    "IRFAN": "عرفان",
+    "BILAL": "بلال",
+    "HAMZA": "حمزة",
+    "ZULFIQAR": "ذو الفقار",
+    "ABDUL": "عبد ال", "ABD": "عبد", "ABDULLAH": "عبد الله", "ABDUR": "عبد ال",
+    "REHMAN": "رحمن", "RAHMAN": "رحمن", "RAHEEM": "رحيم", "RASHEED": "رشيد",
+    "WAQAS": "وقاص",
+    "FAISAL": "فيصل",
+    "NAEEM": "نعيم",
+    "NADEEM": "نديم",
+    "WAHEED": "وحيد",
+    "SAEED": "سعيد",
+    "JAVAID": "جاويد", "JAVED": "جاويد",
+    "IQBAL": "إقبال",
+    "ASGHAR": "أصغر",
+    "SHAH": "شاه",
+    "SYED": "سيد",
+    "CHAUDHRY": "تشودري", "CHAUDHARY": "تشودري", "CH": "تشودري",
+    "BHATTI": "بهتي",
+    "BUTT": "بت",
+    "SHEIKH": "شيخ",
+    "QURESHI": "قريشي",
+    "SIDDIQUI": "صديقي", "SIDDIQI": "صديقي",
+    "BAIG": "بيك", "BEG": "بيك",
+    "MIAN": "ميان",
+    "BIBI": "بي بي",
+    "BEGUM": "بيكم",
+    "MAQBOOL": "مقبول",
+    "MANZOOR": "منظور",
+    "MUSTAFA": "مصطفى",
+    "ZIA": "ضياء",
+    "IJAZ": "إعجاز",
+    "AYOUB": "أيوب", "AYUB": "أيوب",
+    "YASIR": "ياسر",
+    "YASMEEN": "ياسمين",
+    "NASREEN": "نسرين",
+    "PARVEEN": "برفين",
+    "TAHIRA": "طاهرة",
+    "SAJID": "ساجد",
+    "MAJID": "ماجد",
+    "ABID": "عابد",
+    "ZAHID": "زاهد",
+    "WAJID": "واجد",
+    "SHABBIR": "شبير",
+    "BASHIR": "بشير",
+    "NAZIR": "نظير",
+    "MUNAWAR": "منور",
+    "RIAZ": "رياض",
+    "LIAQAT": "لياقت",
+    "SHAFEEQ": "شفيق",
+    "RAFIQ": "رفيق",
+    "SULTAN": "سلطان",
+    "FAROOQ": "فاروق",
+    "SHOUKAT": "شوكت",
+    "LIAQUAT": "لياقت",
+    "ASAD": "أسد",
+    "SARFRAZ": "سرفراز",
+    "ZAFAR": "ظفر",
+    "AZHAR": "أزهر",
+    "SHAHBAZ": "شهباز",
+    "KAMRAN": "كامران",
+    "ADNAN": "عدنان",
+    "NOMAN": "نعمان", "NUMAN": "نعمان",
+    "ARSLAN": "أرسلان",
+    "REHAN": "ريحان",
+    "SOHAIL": "سهيل", "SUHAIL": "سهيل",
+    "TANVEER": "تنوير", "TANVIR": "تنوير",
+    "JAVERIA": "جويرية",
+    "HINA": "حنا",
+    "KIRAN": "كيران",
+    "SANA": "ثناء",
+    "IQRA": "إقرأ",
+    "SIDRA": "سدرة",
+    "NIMRA": "نمرة",
+    "MEHREEN": "مهرين",
+    "ALAM": "عالم",
+    "DIN": "الدين", "DEEN": "الدين",
+    "ULLAH": "الله",
+    "UR": "ال",
+}
+
+def is_arabic_text(text: str) -> bool:
+    if not text or not isinstance(text, str):
+        return False
+    return any('\u0600' <= char <= '\u06FF' or '\u0750' <= char <= '\u077F' or '\u08A0' <= char <= '\u08FF' for char in text)
+
+def transliterate_phonetic_word(word: str) -> str:
+    """Fallback character-by-character transliteration of unknown English words into Arabic script."""
+    w = word.upper().strip()
+    if not w:
+        return ""
+    if is_arabic_text(w):
+        return w
+    if w in ARABIC_NAME_DICT:
+        return ARABIC_NAME_DICT[w]
+
+    replacements = [
+        ("KH", "خ"), ("GH", "غ"), ("SH", "ش"), ("CH", "تش"),
+        ("TH", "ث"), ("DH", "ذ"), ("ZH", "ژ"), ("PH", "ف"),
+        ("OU", "و"), ("OO", "و"), ("EE", "ي"), ("AI", "اي"), ("EI", "اي"),
+        ("AU", "او"), ("AL-", "ال"), ("AL", "ال"),
+    ]
+    for eng, ar in replacements:
+        w = w.replace(eng, ar)
+
+    char_map = {
+        'A': 'ا', 'B': 'ب', 'C': 'ك', 'D': 'د', 'E': 'ي',
+        'F': 'ف', 'G': 'ج', 'H': 'ه', 'I': 'ي', 'J': 'ج',
+        'K': 'ك', 'L': 'ل', 'M': 'م', 'N': 'ن', 'O': 'و',
+        'P': 'ب', 'Q': 'ق', 'R': 'ر', 'S': 'س', 'T': 'ت',
+        'U': 'و', 'V': 'ف', 'W': 'و', 'X': 'كس', 'Y': 'ي', 'Z': 'ز'
+    }
+    res = []
+    for c in w:
+        if c in char_map:
+            res.append(char_map[c])
+        else:
+            res.append(c)
+    return "".join(res)
+
+def translate_single_field_to_arabic(text: str) -> str:
+    """Translates a full name or single field into authentic Arabic script."""
+    if not text or not str(text).strip() or str(text).strip().upper() in ['N/A', 'NOT DETECTED', 'NONE']:
+        return "N/A"
+    clean = str(text).strip()
+    if is_arabic_text(clean):
+        return clean
+
+    tokens = clean.replace(',', ' ').replace('-', ' ').split()
+    translated_tokens = []
+    for tok in tokens:
+        up = tok.upper().strip()
+        if not up:
+            continue
+        if up in ARABIC_NAME_DICT:
+            translated_tokens.append(ARABIC_NAME_DICT[up])
+        else:
+            translated_tokens.append(transliterate_phonetic_word(up))
+
+    out = " ".join(translated_tokens).strip()
+    out = out.replace("عبد ال ", "عبد ال")
+    return out or clean
+
+# ==============================================================================
 # EXCEL EXPORTER SERVICE (With Blank Lines Between User Requests)
 # ==============================================================================
 def export_confirmed_passports_to_excel(request_id: Optional[str] = None, direct_passengers: Optional[List[Dict[str, Any]]] = None) -> str:
@@ -218,8 +400,14 @@ def export_confirmed_passports_to_excel(request_id: Optional[str] = None, direct
         for p in direct_passengers:
             fn = p.get('firstName') or p.get('first_name') or ''
             ln = p.get('lastName') or p.get('last_name') or ''
-            fn_ar = p.get('firstNameAr') or p.get('first_name_ar') or translate_single_field_to_arabic(fn)
-            ln_ar = p.get('lastNameAr') or p.get('last_name_ar') or translate_single_field_to_arabic(ln)
+            fn_ar = p.get('firstNameAr') or p.get('first_name_ar') or ''
+            ln_ar = p.get('lastNameAr') or p.get('last_name_ar') or ''
+
+            if not is_arabic_text(fn_ar):
+                fn_ar = translate_single_field_to_arabic(fn)
+            if not is_arabic_text(ln_ar):
+                ln_ar = translate_single_field_to_arabic(ln)
+
             pno = str(p.get('passportNumber') or p.get('passport_number') or 'N/A').upper()
             nat = p.get('nationality') or 'Pakistani'
             dob = p.get('dob') or p.get('date_of_birth') or 'N/A'
@@ -367,18 +555,6 @@ def compress_image_if_needed(image_bytes: bytes, max_dim: int = 1200) -> tuple[b
     except Exception:
         return image_bytes, "image/jpeg"
 
-def translate_single_field_to_arabic(text: str) -> str:
-    """Instant translation engine fallback so Arabic translation never fails."""
-    if not text or not text.strip() or text.strip().upper() in ['N/A', 'NONE', '-']:
-        return "N/A"
-    try:
-        q = urllib.parse.quote(text.strip())
-        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ar&dt=t&q={q}"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        res = json.loads(urllib.request.urlopen(req, timeout=5).read().decode('utf-8'))
-        return res[0][0][0]
-    except Exception:
-        return text
 
 def apply_father_name_rule(data: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -710,7 +886,7 @@ def run_gemini_arabic_translation(english_data: Dict[str, Any], api_key: Optiona
         Nationality: {english_data.get('nationality', '')}
         """
 
-        candidate_models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite', 'gemini-flash-latest']
+        candidate_models = ['gemini-2.5-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-pro', 'gemini-2.0-flash', 'gemini-flash-latest']
         response = None
         for k in keys:
             key_exhausted = False

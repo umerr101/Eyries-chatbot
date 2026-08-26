@@ -233,11 +233,15 @@ async function handleVisaFlow(phone, session, incomingMsg, mediaUrl) {
       const requestId = session.voucherId || cleanPhone;
 
       let confirmMsg = null;
+      let arabicRecord = null;
       try {
         const passportNum = session.passportData?.passportNumber;
         const res = await confirmPassportWithGemini(passportNum, session.passportData, cleanPhone, requestId);
         if (res && res.whatsapp_message) {
           confirmMsg = res.whatsapp_message;
+        }
+        if (res && res.record) {
+          arabicRecord = res.record;
         }
       } catch (err) {
         console.error('[VisaFlow] Gemini Confirmation error:', err.message);
@@ -268,6 +272,8 @@ async function handleVisaFlow(phone, session, incomingMsg, mediaUrl) {
         currentPassengers.push({
           firstName: session.passportData.firstName || 'Passenger',
           lastName: session.passportData.lastName || '',
+          firstNameAr: arabicRecord?.first_name_ar || arabicRecord?.firstNameAr || '',
+          lastNameAr: arabicRecord?.last_name_ar || arabicRecord?.lastNameAr || '',
           passportNumber: (session.passportData.passportNumber || 'N/A').toUpperCase(),
           nationality: session.passportData.nationality || 'Pakistani',
           expiryDate: session.passportData.expiryDate || 'N/A',

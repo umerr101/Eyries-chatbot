@@ -69,13 +69,26 @@ async function notifyAdminNewOrder(client, phone, session) {
     await client.sendMessage(adminId, summaryMessage);
     await new Promise(res => setTimeout(res, 600));
 
-    // Resolve passport image paths on disk (with fallback to uploads directory or in-memory list)
-    let savedPaths = session.savedPassportPaths || [];
+    // Resolve passport image paths on disk (with fallback to scanning uploads/passports)
+    let savedPaths = (session.savedPassportPaths || []).filter(p => p && fs.existsSync(p));
     if (savedPaths.length === 0) {
-      const uploadDir = path.resolve(__dirname, '..', '..', 'uploads', 'passports', cleanPhone);
-      if (fs.existsSync(uploadDir)) {
-        const files = fs.readdirSync(uploadDir).filter(f => f.match(/\.(jpg|jpeg|png)$/i));
-        savedPaths = files.map(f => path.join(uploadDir, f));
+      const rootUploads = path.resolve(__dirname, '..', '..', 'uploads', 'passports');
+      if (fs.existsSync(rootUploads)) {
+        const subdirs = fs.readdirSync(rootUploads);
+        for (const sub of subdirs) {
+          const subPath = path.join(rootUploads, sub);
+          try {
+            if (fs.statSync(subPath).isDirectory()) {
+              const files = fs.readdirSync(subPath).filter(f => f.match(/\.(jpg|jpeg|png)$/i));
+              if (sub.includes(cleanPhone) || cleanPhone.includes(sub) || subdirs.length <= 2) {
+                for (const f of files) {
+                  const fullF = path.join(subPath, f);
+                  if (!savedPaths.includes(fullF)) savedPaths.push(fullF);
+                }
+              }
+            }
+          } catch (_) {}
+        }
       }
     }
 
@@ -87,7 +100,7 @@ async function notifyAdminNewOrder(client, phone, session) {
         if (filePath && fs.existsSync(filePath)) {
           try {
             const media = MessageMedia.fromFilePath(filePath);
-            console.log(`[AdminNotifier] Forwarding passport image ${i + 1}/${savedPaths.length} to admin...`);
+            console.log(`[AdminNotifier] Forwarding passport image ${i + 1}/${savedPaths.length} to admin (${adminId})...`);
             await client.sendMessage(adminId, media, { caption: `📄 Passport Photo ${i + 1} of ${passengerCount} (Customer: +${cleanPhone})` });
             await new Promise(res => setTimeout(res, 800));
           } catch (mediaErr) {
@@ -101,7 +114,7 @@ async function notifyAdminNewOrder(client, phone, session) {
         if (m && m.data) {
           try {
             const media = new MessageMedia(m.mimetype || 'image/jpeg', m.data, `passport_${i + 1}.jpg`);
-            console.log(`[AdminNotifier] Forwarding in-memory passport image ${i + 1}/${mediaList.length} to admin...`);
+            console.log(`[AdminNotifier] Forwarding in-memory passport image ${i + 1}/${mediaList.length} to admin (${adminId})...`);
             await client.sendMessage(adminId, media, { caption: `📄 Passport Photo ${i + 1} of ${passengerCount} (Customer: +${cleanPhone})` });
             await new Promise(res => setTimeout(res, 800));
           } catch (mediaErr) {
@@ -111,15 +124,15 @@ async function notifyAdminNewOrder(client, phone, session) {
       }
     }
 
-    // Forward Master_Passports.xlsx if this is a Visa or Package order with uploaded passport images
-    const isVisaWithPassports = (session.flow === 'VISA' || session.flow?.startsWith('PACKAGE') || (session.passengers && session.passengers.length > 0)) && session.passportConfirmed;
+    // Forward Master_Passports.xlsx if this is a Visa or Package order with passport records
+    const isVisaWithPassports = session.flow === 'VISA' || session.flow?.startsWith('PACKAGE') || (session.passengers && session.passengers.length > 0) || savedPaths.length > 0;
 
     if (isVisaWithPassports) {
       const { exportExcelForWindow } = require('../ocr/pythonBridge');
       const orderId = session.voucherId || cleanPhone;
       try {
         console.log(`[AdminNotifier] Generating fresh Master_Passports.xlsx for visa window (${orderId}) with ${session.passengers?.length || 0} passengers...`);
-        await exportExcelForWindow(orderId, session.passengers);
+        await exportExcelForWindow(orderId, session.passengers || []);
       } catch (e) {
         console.warn('[AdminNotifier] exportExcelForWindow warning:', e.message);
       }
