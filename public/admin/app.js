@@ -194,38 +194,280 @@ function initEventHandlers() {
     });
   });
 
-  // KPI Metrics Cards Click Handlers
+  // KPI Metrics Cards Click Handlers (Open Popup Modals in Same Section)
   const kpiCards = document.querySelectorAll('.kpi-grid .kpi-card');
   if (kpiCards.length >= 4) {
-    // 1. Total Revenue Card -> Cashflow & Financial Ledger
+    // 1. Total Revenue Card
     kpiCards[0].style.cursor = 'pointer';
-    kpiCards[0].title = 'Click to open Cashflow & Financial Ledger';
-    kpiCards[0].addEventListener('click', () => switchTab('cashflow'));
+    kpiCards[0].title = 'Click to open Total Revenue breakdown popup';
+    kpiCards[0].addEventListener('click', () => openKpiModal('revenue'));
 
-    // 2. Cash on Ground (KSA) Card -> Bookings Pipeline (Cash Confirmed Filter)
+    // 2. Cash on Ground (KSA) Card
     kpiCards[1].style.cursor = 'pointer';
-    kpiCards[1].title = 'Click to view Cash on Ground (KSA) Bookings';
-    kpiCards[1].addEventListener('click', () => {
-      switchTab('orders');
-      filterOrders('CASH_CONFIRMED');
-    });
+    kpiCards[1].title = 'Click to open Cash on Ground (KSA) popup';
+    kpiCards[1].addEventListener('click', () => openKpiModal('cash'));
 
-    // 3. Pending Receivables Card -> Bookings Pipeline (Pending Filter)
+    // 3. Pending Receivables Card
     kpiCards[2].style.cursor = 'pointer';
-    kpiCards[2].title = 'Click to view Pending Payment Receivables';
-    kpiCards[2].addEventListener('click', () => {
-      switchTab('orders');
-      filterOrders('PENDING');
-    });
+    kpiCards[2].title = 'Click to open Pending Receivables popup';
+    kpiCards[2].addEventListener('click', () => openKpiModal('pending'));
 
-    // 4. Total Pilgrims Card -> Bookings Pipeline (All Verified Pax)
+    // 4. Total Pilgrims Card
     kpiCards[3].style.cursor = 'pointer';
-    kpiCards[3].title = 'Click to view All Booking Vouchers & Pilgrims';
-    kpiCards[3].addEventListener('click', () => {
-      switchTab('orders');
-      filterOrders('ALL');
-    });
+    kpiCards[3].title = 'Click to open Verified Pilgrims Roster popup';
+    kpiCards[3].addEventListener('click', () => openKpiModal('pilgrims'));
   }
+}
+
+function openKpiModal(type) {
+  const modal = document.getElementById('kpiDetailModal');
+  const title = document.getElementById('kpiModalTitle');
+  const subtitle = document.getElementById('kpiModalSubtitle');
+  const icon = document.getElementById('kpiModalIcon');
+  const body = document.getElementById('kpiModalBody');
+  if (!modal || !body) return;
+
+  const orders = allOrdersData || [];
+
+  if (type === 'revenue') {
+    icon.className = 'modal-icon icon-emerald';
+    icon.innerHTML = '<i class="fa-solid fa-wallet"></i>';
+    title.textContent = 'Total Revenue Breakdown';
+    subtitle.textContent = 'Summary of all completed & approved package booking vouchers';
+
+    let totalSAR = 0;
+    let totalPKR = 0;
+    const rows = orders.map(o => {
+      const s = o.sessionData || {};
+      const { costSAR, costPKR } = getClientOrderAmount(s);
+      totalSAR += costSAR;
+      totalPKR += costPKR;
+      const guest = s.familyHeadName || (s.passportData ? `${s.passportData.firstName} ${s.passportData.lastName}` : 'Guest');
+      return `
+        <tr>
+          <td>
+            <a href="/vouchers/${o.voucherId}.pdf" target="_blank" style="color:var(--accent-cyan); font-weight:700; text-decoration:none;">
+              <i class="fa-solid fa-file-pdf" style="color:var(--accent-rose);"></i> ${o.voucherId}
+            </a>
+          </td>
+          <td><strong>${guest}</strong></td>
+          <td><strong>${costSAR.toLocaleString()} SAR</strong></td>
+          <td>~ ${costPKR.toLocaleString()} PKR</td>
+          <td>${s.paymentType === 'CASH_KSA' ? '💵 Cash (KSA)' : '🏦 Bank Deposit'}</td>
+          <td><span class="badge-status ${getStatusClass(o.status)}">${o.status || 'APPROVED'}</span></td>
+        </tr>
+      `;
+    }).join('');
+
+    body.innerHTML = `
+      <div class="modal-stats-grid">
+        <div class="modal-stat-box">
+          <div class="modal-stat-label">Total Revenue (SAR)</div>
+          <div class="modal-stat-value" style="color:var(--accent-emerald);">${totalSAR.toLocaleString()} SAR</div>
+        </div>
+        <div class="modal-stat-box">
+          <div class="modal-stat-label">Converted Total (PKR)</div>
+          <div class="modal-stat-value" style="color:var(--accent-cyan);">~ ${totalPKR.toLocaleString()} PKR</div>
+        </div>
+        <div class="modal-stat-box">
+          <div class="modal-stat-label">Total Booking Vouchers</div>
+          <div class="modal-stat-value" style="color:var(--text-primary);">${orders.length} Vouchers</div>
+        </div>
+      </div>
+      <div class="modal-table-wrap mt-4">
+        <table class="modal-table">
+          <thead>
+            <tr>
+              <th>Voucher ID</th>
+              <th>Guest / Head</th>
+              <th>Amount (SAR)</th>
+              <th>Amount (PKR)</th>
+              <th>Payment Mode</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>${rows || '<tr><td colspan="6" class="text-center py-4 text-muted">No revenue orders found.</td></tr>'}</tbody>
+        </table>
+      </div>
+    `;
+  } else if (type === 'cash') {
+    icon.className = 'modal-icon icon-amber';
+    icon.innerHTML = '<i class="fa-solid fa-money-bill-wave"></i>';
+    title.textContent = 'Cash on Ground (KSA) Ledger';
+    subtitle.textContent = 'Saudi Riyal cash hand-delivered in Makkah & Madinah';
+
+    const cashOrders = orders.filter(o => o.sessionData?.paymentType === 'CASH_KSA' || o.status === 'CASH_CONFIRMED');
+    let totalCashSAR = 0;
+    const rows = cashOrders.map(o => {
+      const s = o.sessionData || {};
+      const { costSAR } = getClientOrderAmount(s);
+      totalCashSAR += costSAR;
+      const guest = s.familyHeadName || (s.passportData ? `${s.passportData.firstName} ${s.passportData.lastName}` : 'Guest');
+      return `
+        <tr>
+          <td>
+            <a href="/vouchers/${o.voucherId}.pdf" target="_blank" style="color:var(--accent-cyan); font-weight:700; text-decoration:none;">
+              <i class="fa-solid fa-file-pdf" style="color:var(--accent-rose);"></i> ${o.voucherId}
+            </a>
+          </td>
+          <td><strong>${guest}</strong></td>
+          <td><strong>${costSAR.toLocaleString()} SAR</strong></td>
+          <td>💵 Hand-delivered in Saudi</td>
+          <td><span class="badge-status status-approved">CASH CONFIRMED</span></td>
+        </tr>
+      `;
+    }).join('');
+
+    body.innerHTML = `
+      <div class="modal-stats-grid">
+        <div class="modal-stat-box">
+          <div class="modal-stat-label">Total Cash Collected (SAR)</div>
+          <div class="modal-stat-value" style="color:var(--accent-amber);">${totalCashSAR.toLocaleString()} SAR</div>
+        </div>
+        <div class="modal-stat-box">
+          <div class="modal-stat-label">Cash Bookings Count</div>
+          <div class="modal-stat-value" style="color:var(--text-primary);">${cashOrders.length} Bookings</div>
+        </div>
+      </div>
+      <div class="modal-table-wrap mt-4">
+        <table class="modal-table">
+          <thead>
+            <tr>
+              <th>Voucher ID</th>
+              <th>Guest / Head</th>
+              <th>Amount (SAR)</th>
+              <th>Delivery Status</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>${rows || '<tr><td colspan="5" class="text-center py-4 text-muted">No cash-on-ground transactions recorded yet.</td></tr>'}</tbody>
+        </table>
+      </div>
+    `;
+  } else if (type === 'pending') {
+    icon.className = 'modal-icon icon-rose';
+    icon.innerHTML = '<i class="fa-solid fa-clock-rotate-left"></i>';
+    title.textContent = 'Pending Payment Receivables';
+    subtitle.textContent = 'Bookings awaiting payment deposit or accounts verification';
+
+    const pendingOrders = orders.filter(o => o.status === 'PENDING' || o.status === 'AWAIT_ACCOUNTS_VERIFICATION');
+    let totalPendingSAR = 0;
+    let totalPendingPKR = 0;
+    const rows = pendingOrders.map(o => {
+      const s = o.sessionData || {};
+      const { costSAR, costPKR } = getClientOrderAmount(s);
+      totalPendingSAR += costSAR;
+      totalPendingPKR += costPKR;
+      const guest = s.familyHeadName || (s.passportData ? `${s.passportData.firstName} ${s.passportData.lastName}` : 'Guest');
+      return `
+        <tr>
+          <td>
+            <a href="/vouchers/${o.voucherId}.pdf" target="_blank" style="color:var(--accent-cyan); font-weight:700; text-decoration:none;">
+              <i class="fa-solid fa-file-pdf" style="color:var(--accent-rose);"></i> ${o.voucherId}
+            </a>
+          </td>
+          <td><strong>${guest}</strong></td>
+          <td>+${(o.customerPhone || '').replace('@c.us', '')}</td>
+          <td><strong>${costSAR.toLocaleString()} SAR</strong></td>
+          <td>~ ${costPKR.toLocaleString()} PKR</td>
+          <td><span class="badge-status status-pending">${o.status || 'PENDING'}</span></td>
+          <td>
+            <button class="btn-table btn-approve" onclick="approveOrder('${o.voucherId}'); document.getElementById('kpiDetailModal').classList.remove('active');">Approve</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    body.innerHTML = `
+      <div class="modal-stats-grid">
+        <div class="modal-stat-box">
+          <div class="modal-stat-label">Pending Receivables (SAR)</div>
+          <div class="modal-stat-value" style="color:var(--accent-rose);">${totalPendingSAR.toLocaleString()} SAR</div>
+        </div>
+        <div class="modal-stat-box">
+          <div class="modal-stat-label">Pending Receivables (PKR)</div>
+          <div class="modal-stat-value" style="color:var(--accent-amber);">~ ${totalPendingPKR.toLocaleString()} PKR</div>
+        </div>
+        <div class="modal-stat-box">
+          <div class="modal-stat-label">Pending Orders Count</div>
+          <div class="modal-stat-value" style="color:var(--text-primary);">${pendingOrders.length} Orders</div>
+        </div>
+      </div>
+      <div class="modal-table-wrap mt-4">
+        <table class="modal-table">
+          <thead>
+            <tr>
+              <th>Voucher ID</th>
+              <th>Guest / Head</th>
+              <th>WhatsApp Contact</th>
+              <th>Amount (SAR)</th>
+              <th>Amount (PKR)</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>${rows || '<tr><td colspan="7" class="text-center py-4 text-muted">No pending payment receivables at this time. All clear!</td></tr>'}</tbody>
+        </table>
+      </div>
+    `;
+  } else if (type === 'pilgrims') {
+    icon.className = 'modal-icon icon-cyan';
+    icon.innerHTML = '<i class="fa-solid fa-users"></i>';
+    title.textContent = 'Verified Group Pilgrims Roster';
+    subtitle.textContent = 'Verified passenger passports across all confirmed vouchers';
+
+    let totalPax = 0;
+    const rows = orders.map(o => {
+      const s = o.sessionData || {};
+      const p = s.passportData || {};
+      const pax = s.passengerCount || 1;
+      totalPax += pax;
+      return `
+        <tr>
+          <td><strong style="font-family:monospace; color:var(--accent-cyan);">${p.passportNumber || 'CONFIRMED'}</strong></td>
+          <td><strong>${s.familyHeadName || `${p.firstName || 'Group'} ${p.lastName || 'Passenger'}`}</strong></td>
+          <td>${p.nationality || 'PAKISTANI'}</td>
+          <td>${p.expiryDate || 'Valid'}</td>
+          <td>
+            <a href="/vouchers/${o.voucherId}.pdf" target="_blank" style="color:var(--accent-cyan); font-weight:700; text-decoration:none;">
+              <i class="fa-solid fa-file-pdf" style="color:var(--accent-rose);"></i> ${o.voucherId}
+            </a>
+          </td>
+          <td><span class="badge-status status-approved">VERIFIED</span></td>
+        </tr>
+      `;
+    }).join('');
+
+    body.innerHTML = `
+      <div class="modal-stats-grid">
+        <div class="modal-stat-box">
+          <div class="modal-stat-label">Total Verified Pilgrims</div>
+          <div class="modal-stat-value" style="color:var(--accent-cyan);">${totalPax} Pilgrims</div>
+        </div>
+        <div class="modal-stat-box">
+          <div class="modal-stat-label">Confirmed Group Vouchers</div>
+          <div class="modal-stat-value" style="color:var(--accent-emerald);">${orders.length} Vouchers</div>
+        </div>
+      </div>
+      <div class="modal-table-wrap mt-4">
+        <table class="modal-table">
+          <thead>
+            <tr>
+              <th>Passport No</th>
+              <th>Passenger / Head Name</th>
+              <th>Nationality</th>
+              <th>Passport Expiry</th>
+              <th>Voucher ID</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>${rows || '<tr><td colspan="6" class="text-center py-4 text-muted">No passenger records found.</td></tr>'}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  modal.classList.add('active');
 }
 
 function filterOrders(filter = 'ALL') {

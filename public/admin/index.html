@@ -378,6 +378,25 @@
     </div>
   </div>
 
+  <!-- KPI Detail Popup Modal -->
+  <div id="kpiDetailModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div id="kpiModalIcon" class="modal-icon icon-emerald"><i class="fa-solid fa-chart-line"></i></div>
+          <div>
+            <h3 id="kpiModalTitle">Metric Details</h3>
+            <span id="kpiModalSubtitle" class="modal-subtitle">Operational Breakdown</span>
+          </div>
+        </div>
+        <button class="modal-close-btn" onclick="document.getElementById('kpiDetailModal').classList.remove('active')">&times;</button>
+      </div>
+      <div id="kpiModalBody" class="modal-body">
+        <div class="text-center py-4">Loading details...</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Dashboard Script -->
   <script src="/admin/app.js"></script>
 </body>
