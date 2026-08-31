@@ -8,6 +8,29 @@ import os
 import glob
 import re
 
+def get_voucher_prices(pdf_path):
+    total_sar = 790
+    total_pkr = 59650
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(pdf_path)
+        text = ''
+        for p in reader.pages:
+            text += p.extract_text()
+        
+        sar_match = re.search(r'Total Package Price.*?:?\s*([0-9,]+)\s*SAR', text, re.IGNORECASE)
+        pkr_match = re.search(r'approx\.?\s*([0-9,]+)\s*PKR', text, re.IGNORECASE)
+
+        if sar_match:
+            total_sar = int(sar_match.group(1).replace(',', ''))
+        if pkr_match:
+            total_pkr = int(pkr_match.group(1).replace(',', ''))
+        else:
+            total_pkr = int(total_sar * 75.51)
+    except Exception:
+        pass
+    return total_sar, total_pkr
+
 def get_all_vouchers_and_passports():
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     db_path = os.path.join(base_dir, 'passports.db')
@@ -36,12 +59,14 @@ def get_all_vouchers_and_passports():
                         'customerPhone': r[7] or '923180978480@c.us',
                         'requestId': v_id,
                         'status': r[9] or 'Confirmed',
-                        'createdAt': r[10] or '2026-08-28 12:00:00'
+                        'createdAt': r[10] or '2026-08-28 12:00:00',
+                        'totalSar': 790,
+                        'totalPkr': 59650
                     }
         except Exception:
             pass
 
-    # 2. Read all PDF voucher files from itineraries/ directory
+    # 2. Read all PDF voucher files from itineraries/ directory to attach exact prices
     if os.path.exists(itineraries_dir):
         pdf_files = glob.glob(os.path.join(itineraries_dir, '*.pdf'))
         for pf in pdf_files:
@@ -49,7 +74,12 @@ def get_all_vouchers_and_passports():
             match = re.search(r'(SST-[0-9]{8}-[0-9]{4}|EV-[0-9]{8}-[0-9]{4})', fname, re.IGNORECASE)
             if match:
                 v_id = match.group(1).upper()
-                if v_id not in vouchers_map:
+                sar, pkr = get_voucher_prices(pf)
+
+                if v_id in vouchers_map:
+                    vouchers_map[v_id]['totalSar'] = sar
+                    vouchers_map[v_id]['totalPkr'] = pkr
+                else:
                     vouchers_map[v_id] = {
                         'passportNumber': 'CONFIRMED',
                         'firstName': 'Group',
@@ -61,7 +91,9 @@ def get_all_vouchers_and_passports():
                         'customerPhone': '923180978480@c.us',
                         'requestId': v_id,
                         'status': 'Confirmed',
-                        'createdAt': '2026-08-28 12:00:00'
+                        'createdAt': '2026-08-28 12:00:00',
+                        'totalSar': sar,
+                        'totalPkr': pkr
                     }
 
     res = list(vouchers_map.values())

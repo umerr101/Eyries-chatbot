@@ -28,6 +28,8 @@ function syncPassportsDbOrders(ordersObj) {
         if (isSixSigmaOrder && !isCurrentClientSixSigma && clientId !== 'default') continue;
 
         if (!ordersObj[vId]) {
+          const sarAmount = rec.totalSar || 790;
+          const pkrAmount = rec.totalPkr || Math.round(sarAmount * 75.51);
           ordersObj[vId] = {
             voucherId: vId,
             customerPhone: rec.customerPhone || '923180978480@c.us',
@@ -37,9 +39,9 @@ function syncPassportsDbOrders(ordersObj) {
               step: 'PAYMENT',
               familyHeadName: `${rec.firstName || ''} ${rec.lastName || ''}`.trim() || 'Guest Head',
               passengerCount: 1,
-              finalVisaRate: 790,
-              totalSar: 790,
-              totalPkr: 58855,
+              finalVisaRate: sarAmount,
+              totalSar: sarAmount,
+              totalPkr: pkrAmount,
               paymentType: 'BANK_DEPOSIT',
               passportData: {
                 firstName: rec.firstName,
