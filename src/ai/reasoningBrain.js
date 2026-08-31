@@ -50,29 +50,34 @@ RESPONSE STYLE:
  * 1. Generates natural language reasoning reply for customer queries.
  */
 async function generateReasoningReply(userMessage, conversationHistory = [], userSession = {}, clientConfig = null) {
-  if (!API_KEY) {
-    console.warn('[ReasoningBrain] GEMINI_API_KEY is not set in environment.');
-    return null;
+  const agencyName = clientConfig?.agencyName || 'Eyries Holidays';
+
+  // 1. Call Python google-genai SDK (Fast & Reliable)
+  try {
+    const { runAIReasoningWithGemini } = require('../ocr/pythonBridge');
+    const pyReply = await runAIReasoningWithGemini(userMessage, userSession, agencyName);
+    if (pyReply && pyReply.trim()) {
+      return pyReply.trim();
+    }
+  } catch (pyErr) {
+    console.warn('[ReasoningBrain PythonBridge Warning]:', pyErr.message);
   }
 
+  // 2. Direct REST Fallback
+  if (!API_KEY) return null;
   const systemInstruction = getSystemInstruction(clientConfig || config);
-  const currentStep = userSession.step || 'START';
-  const currentFlow = userSession.flow || 'MAIN_MENU';
-
   const promptText = `
 [SYSTEM CONTEXT & KNOWLEDGE]
 ${systemInstruction}
 
 [USER SESSION CONTEXT]
-- Current Flow: ${currentFlow}
-- Current Step: ${currentStep}
-- Selected Passengers: ${userSession.passengerCount || 'Not specified'}
-- Calculated Visa Rate: ${userSession.finalVisaRate ? userSession.finalVisaRate + ' SAR' : 'Not calculated'}
+- Current Flow: ${userSession.flow || 'MAIN_MENU'}
+- Current Step: ${userSession.step || 'START'}
 
 [INCOMING CUSTOMER MESSAGE]
 "${userMessage}"
 
-Generate a helpful, accurate, and concise WhatsApp reply based on the system context.
+Generate a helpful, accurate, and concise WhatsApp reply.
 `;
 
   for (const model of CANDIDATE_MODELS) {
@@ -80,33 +85,14 @@ Generate a helpful, accurate, and concise WhatsApp reply based on the system con
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`;
       const payload = {
         contents: [{ parts: [{ text: promptText }] }],
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 800
-        }
+        generationConfig: { temperature: 0.2, maxOutputTokens: 800 }
       };
-
-      const res = await axios.post(url, payload, { timeout: 8000 });
+      const res = await axios.post(url, payload, { timeout: 10000 });
       const text = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text && text.trim()) {
-        return text.trim();
-      }
-    } catch (err) {
-      console.warn(`[ReasoningBrain] REST Model ${model} failed:`, err.response?.data?.error?.message || err.message);
+      if (text && text.trim()) return text.trim();
+    } catch (_) {
       continue;
     }
-  }
-
-  // Fallback to Python google-genai bridge SDK
-  try {
-    const { runAIReasoningWithGemini } = require('../ocr/pythonBridge');
-    const agencyName = clientConfig?.agencyName || 'Eyries Holidays';
-    const pyReply = await runAIReasoningWithGemini(userMessage, userSession, agencyName);
-    if (pyReply && pyReply.trim()) {
-      return pyReply.trim();
-    }
-  } catch (pyErr) {
-    console.error('[ReasoningBrain PythonBridge Error]:', pyErr.message);
   }
 
   return null;
