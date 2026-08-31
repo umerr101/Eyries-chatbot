@@ -136,9 +136,6 @@ const http = require('http');
 const server = http.createServer(app);
 const { initServer } = require('./server');
 
-// Initialize CRM WebServer API & Socket.io
-initServer(client, app, server);
-
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🌐 Operator CRM Dashboard & API Server live at: http://localhost:${PORT}/admin`);
 }).on('error', (err) => {
@@ -187,6 +184,9 @@ const client = new Client({
     type: 'none',
   }
 });
+
+// Initialize CRM WebServer API & Socket.io
+initServer(client, app, server);
 
 const QRCodeImage          = require('qrcode');
 
