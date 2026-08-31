@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operator CRM & Real-Time Desk — Eyries Holidays</title>
+  
+  <!-- Google Fonts & Font Awesome Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Chart.js & Socket.io -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+
+  <!-- Custom Dashboard Styling -->
+  <link rel="stylesheet" href="/admin/style.css">
+</head>
+<body>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Main CRM Layout -->
+  <div class="crm-app-container">
+
+    <!-- ── Sidebar Navigation ───────────────────────────────── -->
+    <aside class="crm-sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-logo"><i class="fa-solid fa-kaaba"></i></div>
+        <div class="brand-text">
+          <h3 id="agencyBrandTitle">Eyries Holidays</h3>
+          <span>Travel Operator Desk</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-tab="overview">
+          <i class="fa-solid fa-chart-line"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="chats">
+          <i class="fa-solid fa-comments"></i>
+          <span>Live Chat Center</span>
+          <span id="activeChatsBadge" class="nav-badge">0</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="orders">
+          <i class="fa-solid fa-receipt"></i>
+          <span>Bookings Pipeline</span>
+          <span id="pendingOrdersBadge" class="nav-badge badge-warning">0</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="occupancy">
+          <i class="fa-solid fa-hotel"></i>
+          <span>Hotel Inventory</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="movements">
+          <i class="fa-solid fa-bus-simple"></i>
+          <span>Daily Movements</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="cashflow">
+          <i class="fa-solid fa-coins"></i>
+          <span>Cashflow & Finance</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="flights">
+          <i class="fa-solid fa-plane-departure"></i>
+          <span>Flight Manifests</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="settings">
+          <i class="fa-solid fa-sliders"></i>
+          <span>Settings</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="bot-status-card">
+          <div class="status-indicator"></div>
+          <div class="status-info">
+            <span class="status-title">WhatsApp Gateway</span>
+            <span id="botStatusText" class="status-state">Online & Listening</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── Main Workspace ───────────────────────────────────── -->
+    <main class="crm-main-content">
+      
+      <!-- Top Navigation Bar -->
+      <header class="crm-topbar">
+        <div class="page-title-wrap">
+          <h2 id="pageTitle">Dashboard Overview</h2>
+          <p id="pageSubtitle">Real-time operational intelligence and booking management</p>
+        </div>
+
+        <div class="topbar-actions">
+          <div class="forex-pill">
+            <i class="fa-solid fa-money-bill-transfer"></i>
+            <span>SAR / PKR: <strong id="headerForexRate">74.50 PKR</strong></span>
+          </div>
+          <button id="refreshDataBtn" class="action-btn icon-btn" title="Refresh Dashboard Data"><i class="fa-solid fa-rotate-right"></i></button>
+          <button id="themeToggleBtn" class="action-btn icon-btn" title="Toggle Theme"><i class="fa-solid fa-moon"></i></button>
+        </div>
+      </header>
+
+      <!-- Content Tabs Container -->
+      <div class="tab-content-container">
+
+        <!-- ── TAB 1: OVERVIEW ────────────────────────────────── -->
+        <section id="tab-overview" class="tab-pane active">
+          
+          <!-- KPI Metrics Row -->
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-icon icon-emerald"><i class="fa-solid fa-wallet"></i></div>
+              <div class="kpi-info">
+                <span class="kpi-label">Total Revenue</span>
+                <h3 id="kpiRevenueSAR">0 SAR</h3>
+                <small id="kpiRevenuePKR" class="kpi-subtext">~ 0 PKR</small>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-icon icon-amber"><i class="fa-solid fa-money-bill-wave"></i></div>
+              <div class="kpi-info">
+                <span class="kpi-label">Cash on Ground (KSA)</span>
+                <h3 id="kpiCashKSA">0 SAR</h3>
+                <small class="kpi-subtext">Hand-delivered in Saudi</small>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-icon icon-rose"><i class="fa-solid fa-clock-rotate-left"></i></div>
+              <div class="kpi-info">
+                <span class="kpi-label">Pending Receivables</span>
+                <h3 id="kpiPendingReceivables">0 SAR</h3>
+                <small class="kpi-subtext">Awaiting payment verify</small>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-icon icon-cyan"><i class="fa-solid fa-users"></i></div>
+              <div class="kpi-info">
+                <span class="kpi-label">Total Pilgrims</span>
+                <h3 id="kpiTotalPilgrims">0</h3>
+                <small class="kpi-subtext">Verified group pax</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Charts Row -->
+          <div class="charts-grid mt-4">
+            <div class="chart-card">
+              <div class="card-header">
+                <h4>Revenue Breakdown</h4>
+              </div>
+              <div class="chart-container">
+                <canvas id="revenueTrendChart"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="card-header">
+                <h4>Payment Channels</h4>
+              </div>
+              <div class="chart-container">
+                <canvas id="paymentMethodsChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Orders Table -->
+          <div class="table-card mt-4">
+            <div class="card-header">
+              <h4>Recent Booking Leads</h4>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Voucher ID</th>
+                    <th>Guest Head</th>
+                    <th>Phone</th>
+                    <th>Service Flow</th>
+                    <th>Amount</th>
+                    <th>Payment Mode</th>
+                    <th>Status</th>
+                    <th>Quick Action</th>
+                  </tr>
+                </thead>
+                <tbody id="recentOrdersTbody">
+                  <tr><td colspan="8" class="text-center py-4 text-muted">Loading recent orders...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── TAB 2: LIVE CHAT CENTER ────────────────────────── -->
+        <section id="tab-chats" class="tab-pane">
+          <div class="chat-center-layout">
+            
+            <!-- Chat List Sidebar -->
+            <div class="chat-list-sidebar">
+              <div class="chat-search-wrap">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input type="text" id="chatSearchInput" placeholder="Search contact or phone..." class="chat-search-input">
+              </div>
+              <div id="chatListContainer" class="chat-list-scroll">
+                <div class="text-center py-4 text-muted">Loading chat sessions...</div>
+              </div>
+            </div>
+
+            <!-- Active Chat Workspace -->
+            <div class="chat-main-workspace">
+              
+              <!-- Chat Header -->
+              <div class="chat-workspace-header">
+                <div class="chat-user-meta">
+                  <div id="currentChatAvatar" class="avatar-circle">U</div>
+                  <div>
+                    <h4 id="currentChatName">Select a conversation</h4>
+                    <span id="currentChatPhone" class="chat-user-sub">Click a customer on the left to start live chat</span>
+                  </div>
+                </div>
+
+                <div class="chat-header-actions">
+                  <div class="ai-toggle-wrap">
+                    <span class="ai-toggle-label">AI Auto-Reply:</span>
+                    <label class="switch">
+                      <input type="checkbox" id="aiToggleSwitch" checked>
+                      <span class="slider round"></span>
+                    </label>
+                    <span id="aiStatusLabel" class="badge badge-success">ACTIVE</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Message Stream -->
+              <div id="chatMessagesScroll" class="chat-messages-scroll">
+                <div class="empty-chat-prompt">
+                  <i class="fa-solid fa-comments"></i>
+                  <p>Select a customer conversation from the list to view chat history and reply.</p>
+                </div>
+              </div>
+
+              <!-- Reply Input Box -->
+              <div class="chat-reply-bar">
+                <input type="text" id="operatorMessageInput" placeholder="Type operator message... (Press Enter to send)" class="reply-input">
+                <button id="sendOperatorMessageBtn" class="action-btn primary-btn"><i class="fa-solid fa-paper-plane"></i> Send</button>
+              </div>
+            </div>
+
+            <!-- Customer Dossier Sidebar -->
+            <div class="chat-dossier-sidebar">
+              <div class="dossier-header">
+                <h4>Customer Dossier</h4>
+              </div>
+              <div id="dossierContent" class="dossier-body">
+                <div class="text-muted text-center py-4">No chat selected</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── TAB 3: BOOKINGS PIPELINE ────────────────────────── -->
+        <section id="tab-orders" class="tab-pane">
+          <div class="table-card">
+            <div class="card-header flex-header">
+              <h4>All Booking Orders & Vouchers</h4>
+              <div class="filter-pills">
+                <button class="filter-pill active" data-filter="ALL">All</button>
+                <button class="filter-pill" data-filter="PENDING">Pending</button>
+                <button class="filter-pill" data-filter="APPROVED">Approved</button>
+                <button class="filter-pill" data-filter="CASH_CONFIRMED">Cash Confirmed</button>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Voucher ID</th>
+                    <th>Guest / Head</th>
+                    <th>WhatsApp Contact</th>
+                    <th>Service Requested</th>
+                    <th>Pax</th>
+                    <th>Amount (SAR)</th>
+                    <th>Amount (PKR)</th>
+                    <th>Payment Mode</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="allOrdersTbody">
+                  <tr><td colspan="10" class="text-center py-4 text-muted">Loading bookings pipeline...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── TAB 4: HOTEL INVENTORY ─────────────────────────── -->
+        <section id="tab-occupancy" class="tab-pane">
+          <div class="hotel-toolbar">
+            <div class="hotel-city-pills">
+              <button class="filter-pill active" data-hotel-city="ALL">All Cities</button>
+              <button class="filter-pill" data-hotel-city="MAKKAH">🕋 Makkah</button>
+              <button class="filter-pill" data-hotel-city="MADINAH">🕌 Madinah</button>
+              <button class="filter-pill" data-hotel-city="BOOKED">🟢 Active Bookings</button>
+            </div>
+            <div class="hotel-select-wrap">
+              <select id="hotelFilterSelect" class="form-select" onchange="onHotelSelectChange(this.value)">
+                <option value="ALL">Loading hotels...</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="occupancyCardsGrid" class="occupancy-grid mt-4">
+            <div class="text-center py-4 text-muted" style="grid-column:1/-1;">Loading hotel inventory...</div>
+          </div>
+        </section>
+
+        <!-- ── TAB 5: DAILY MOVEMENTS ─────────────────────────── -->
+        <section id="tab-movements" class="tab-pane">
+          <div class="table-card">
+            <div class="card-header flex-header">
+              <h4>Daily Movements Desk (Check-ins & Transfers)</h4>
+              <input type="date" id="movementDateInput" class="form-date-input">
+            </div>
+            <div id="dailyMovementsContent" class="p-4">
+              <div class="text-muted">Select a date to view arrival, departure, and airport transfer rosters.</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── TAB 6: CASHFLOW & FINANCE ──────────────────────── -->
+        <section id="tab-cashflow" class="tab-pane">
+          <div id="cashflowContent" class="p-4">
+            <div class="text-muted">Loading financial accounts...</div>
+          </div>
+        </section>
+
+        <!-- ── TAB 7: FLIGHT MANIFESTS ────────────────────────── -->
+        <section id="tab-flights" class="tab-pane">
+          <div id="flightSeatsContent" class="p-4">
+            <div class="text-muted">Loading flight group seats...</div>
+          </div>
+        </section>
+
+        <!-- ── TAB 8: TENANT SETTINGS ─────────────────────────── -->
+        <section id="tab-settings" class="tab-pane">
+          <div id="settingsContent" class="p-4">
+            <div class="text-muted">Loading tenant configuration...</div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Hotel Detail Modal -->
+  <div id="hotelDetailModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div id="hotelModalIcon" class="modal-icon icon-emerald"><i class="fa-solid fa-kaaba"></i></div>
+          <div>
+            <h3 id="hotelModalTitle">Hotel Details</h3>
+            <span id="hotelModalSubtitle" class="modal-subtitle">Capacity & Check-ins</span>
+          </div>
+        </div>
+        <button class="modal-close-btn" onclick="document.getElementById('hotelDetailModal').classList.remove('active')">&times;</button>
+      </div>
+      <div id="hotelModalBody" class="modal-body">
+        <div class="text-center py-4">Loading details...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard Script -->
+  <script src="/admin/app.js"></script>
+</body>
+</html>

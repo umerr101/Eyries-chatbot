@@ -132,8 +132,15 @@ app.post('/api/calendar-save', async (req, res) => {
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🌐 PDF Voucher & Calendar Server running on port ${PORT}`);
+const http = require('http');
+const server = http.createServer(app);
+const { initServer } = require('./server');
+
+// Initialize CRM WebServer API & Socket.io
+initServer(client, app, server);
+
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🌐 Operator CRM Dashboard & API Server live at: http://localhost:${PORT}/admin`);
 }).on('error', (err) => {
   if (err.code !== 'EADDRINUSE') console.warn('[WebServer] Warning:', err.message);
 });
