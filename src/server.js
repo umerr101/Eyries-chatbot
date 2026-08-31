@@ -263,8 +263,43 @@ function initServer(client, app, server) {
   // 8. Hotel Inventory & Bed Occupancy Report
   app.get('/api/reports/hotel-occupancy', (req, res) => {
     try {
-      const makkahHotels = activeClientConfig.hotels?.makkah || [];
-      const madinahHotels = activeClientConfig.hotels?.madinah || [];
+      const activeClientConfig = loadClientConfig();
+      const clientId = activeClientConfig.clientId || process.env.CLIENT_ID || 'default';
+
+      let makkahHotels = activeClientConfig.makkahHotels || activeClientConfig.hotels?.makkah || [];
+      let madinahHotels = activeClientConfig.madinahHotels || activeClientConfig.hotels?.madinah || [];
+
+      // In Six Sigma dashboard, show both Six Sigma and Masarat Group hotels
+      if (clientId === 'six_sigma' || clientId === 'default') {
+        try {
+          const masaratConfig = loadClientConfig('masarat_group');
+          const masaratMakkah = masaratConfig.makkahHotels || [];
+          const masaratMadinah = masaratConfig.madinahHotels || [];
+
+          // Combine Makkah hotels without duplicates
+          const makkahMap = new Map();
+          makkahHotels.forEach(h => makkahMap.set(h.name.toLowerCase().trim(), h));
+          masaratMakkah.forEach(h => {
+            if (!makkahMap.has(h.name.toLowerCase().trim())) {
+              makkahMap.set(h.name.toLowerCase().trim(), h);
+            }
+          });
+          makkahHotels = Array.from(makkahMap.values());
+
+          // Combine Madinah hotels without duplicates
+          const madinahMap = new Map();
+          madinahHotels.forEach(h => madinahMap.set(h.name.toLowerCase().trim(), h));
+          masaratMadinah.forEach(h => {
+            if (!madinahMap.has(h.name.toLowerCase().trim())) {
+              madinahMap.set(h.name.toLowerCase().trim(), h);
+            }
+          });
+          madinahHotels = Array.from(madinahMap.values());
+        } catch (e) {
+          console.warn('[Server] Could not load masarat_group config for merging:', e.message);
+        }
+      }
+
       const orders = getBookingOrders();
 
       const formatHotelList = (list, city) => list.map(h => {
