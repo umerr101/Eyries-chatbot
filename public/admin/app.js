@@ -558,7 +558,11 @@ function renderOrdersTable(orders) {
 
     return `
       <tr>
-        <td><strong>${o.voucherId}</strong></td>
+        <td>
+          <a href="/vouchers/${o.voucherId}.pdf" target="_blank" style="color:var(--accent-cyan); font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:6px;" title="Click to open official PDF Voucher">
+            <i class="fa-solid fa-file-pdf" style="color:var(--accent-rose);"></i> ${o.voucherId}
+          </a>
+        </td>
         <td>${guest}</td>
         <td>+${cleanPhone}</td>
         <td>${s.flow || 'Umrah Package'}</td>
@@ -598,7 +602,11 @@ function renderRecentOrders(orders) {
 
     return `
       <tr>
-        <td><strong>${o.voucherId}</strong></td>
+        <td>
+          <a href="/vouchers/${o.voucherId}.pdf" target="_blank" style="color:var(--accent-cyan); font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:6px;" title="Click to open official PDF Voucher">
+            <i class="fa-solid fa-file-pdf" style="color:var(--accent-rose);"></i> ${o.voucherId}
+          </a>
+        </td>
         <td>${guest}</td>
         <td>+${cleanPhone}</td>
         <td>${s.flow || 'Umrah Service'}</td>
