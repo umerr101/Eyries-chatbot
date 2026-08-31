@@ -194,18 +194,49 @@ function initEventHandlers() {
     });
   });
 
-  // Chat search
-  const chatSearch = document.getElementById('chatSearchInput');
-  if (chatSearch) {
-    chatSearch.addEventListener('input', (e) => {
-      const q = e.target.value.toLowerCase();
-      const filtered = allChatsData.filter(c => 
-        (c.familyHead && c.familyHead.toLowerCase().includes(q)) ||
-        (c.cleanPhone && c.cleanPhone.includes(q))
-      );
-      renderChatList(filtered);
+  // KPI Metrics Cards Click Handlers
+  const kpiCards = document.querySelectorAll('.kpi-grid .kpi-card');
+  if (kpiCards.length >= 4) {
+    // 1. Total Revenue Card -> Cashflow & Financial Ledger
+    kpiCards[0].style.cursor = 'pointer';
+    kpiCards[0].title = 'Click to open Cashflow & Financial Ledger';
+    kpiCards[0].addEventListener('click', () => switchTab('cashflow'));
+
+    // 2. Cash on Ground (KSA) Card -> Bookings Pipeline (Cash Confirmed Filter)
+    kpiCards[1].style.cursor = 'pointer';
+    kpiCards[1].title = 'Click to view Cash on Ground (KSA) Bookings';
+    kpiCards[1].addEventListener('click', () => {
+      switchTab('orders');
+      filterOrders('CASH_CONFIRMED');
+    });
+
+    // 3. Pending Receivables Card -> Bookings Pipeline (Pending Filter)
+    kpiCards[2].style.cursor = 'pointer';
+    kpiCards[2].title = 'Click to view Pending Payment Receivables';
+    kpiCards[2].addEventListener('click', () => {
+      switchTab('orders');
+      filterOrders('PENDING');
+    });
+
+    // 4. Total Pilgrims Card -> Bookings Pipeline (All Verified Pax)
+    kpiCards[3].style.cursor = 'pointer';
+    kpiCards[3].title = 'Click to view All Booking Vouchers & Pilgrims';
+    kpiCards[3].addEventListener('click', () => {
+      switchTab('orders');
+      filterOrders('ALL');
     });
   }
+}
+
+function filterOrders(filter = 'ALL') {
+  document.querySelectorAll('.filter-pill[data-filter]').forEach(p => {
+    if (p.getAttribute('data-filter') === filter) {
+      p.classList.add('active');
+    } else {
+      p.classList.remove('active');
+    }
+  });
+  loadOrders(filter);
 }
 
 function initThemeToggle() {
