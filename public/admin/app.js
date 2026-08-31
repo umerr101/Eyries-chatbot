@@ -1249,23 +1249,27 @@ async function loadCashflow() {
     if (!json.success) return;
 
     const d = json.data;
-    document.getElementById('cashflowKsaTotal').textContent = `${d.totalKsaCashSAR.toLocaleString()} SAR`;
-    document.getElementById('cashflowBankTotal').textContent = `${d.totalBankPkr.toLocaleString()} PKR`;
-    document.getElementById('cashflowPendingTotal').textContent = `${d.totalPendingReceivablesSAR.toLocaleString()} SAR`;
-    document.getElementById('cashflowPendingPkr').textContent = `~ ${d.totalPendingReceivablesPKR.toLocaleString()} PKR`;
+    if (document.getElementById('cashflowKsaTotal')) document.getElementById('cashflowKsaTotal').textContent = `${(d.totalKsaCashSAR || 0).toLocaleString()} SAR`;
+    if (document.getElementById('cashflowBankTotal')) document.getElementById('cashflowBankTotal').textContent = `${(d.totalBankPkr || 0).toLocaleString()} PKR`;
+    if (document.getElementById('cashflowPendingTotal')) document.getElementById('cashflowPendingTotal').textContent = `${(d.totalPendingReceivablesSAR || 0).toLocaleString()} SAR`;
+    if (document.getElementById('cashflowPendingPkr')) document.getElementById('cashflowPendingPkr').textContent = `~ ${(d.totalPendingReceivablesPKR || 0).toLocaleString()} PKR awaiting verification`;
 
     const tbody = document.getElementById('cashflowTbody');
     if (tbody) {
-      if (d.transactions.length === 0) {
+      if (!d.transactions || d.transactions.length === 0) {
         tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No financial records found.</td></tr>';
       } else {
         tbody.innerHTML = d.transactions.map(t => `
           <tr>
-            <td><strong>${t.voucherId}</strong></td>
-            <td>${t.customerName}</td>
+            <td>
+              <a href="/vouchers/${t.voucherId}.pdf" target="_blank" style="color:var(--accent-cyan); font-weight:700; text-decoration:none;" title="View PDF Voucher">
+                <i class="fa-solid fa-file-pdf" style="color:var(--accent-rose);"></i> ${t.voucherId}
+              </a>
+            </td>
+            <td><strong>${t.customerName}</strong></td>
             <td>+${t.phone}</td>
-            <td><strong>${t.amountSAR.toLocaleString()} SAR</strong></td>
-            <td>${t.amountPKR.toLocaleString()} PKR</td>
+            <td><strong>${(t.amountSAR || 0).toLocaleString()} SAR</strong></td>
+            <td>~ ${(t.amountPKR || 0).toLocaleString()} PKR</td>
             <td>${t.paymentMethod}</td>
             <td><span class="badge-status ${getStatusClass(t.status)}">${t.status}</span></td>
             <td>${t.date}</td>
@@ -1287,37 +1291,41 @@ async function loadFlightSeats() {
 
     const d = json.data;
     const groupsGrid = document.getElementById('flightGroupsGrid');
-    if (groupsGrid) {
+    if (groupsGrid && d.groups) {
       groupsGrid.innerHTML = d.groups.map(g => `
-        <div class="flight-group-card">
+        <div class="occupancy-card">
           <div class="occupancy-card-header">
             <div>
               <span class="city-tag tag-makkah">${g.sector}</span>
               <h4 style="margin-top:6px;">${g.airline}</h4>
             </div>
-            <small style="color:var(--text-muted);">${g.departureDate}</small>
+            <small style="color:var(--text-muted); font-weight:600;">Dep: ${g.departureDate}</small>
           </div>
           <div class="progress-bar-wrap">
             <div class="progress-bar-fill bg-progress-green" style="width: ${g.occupancyPercent}%"></div>
           </div>
           <div class="occupancy-stats-row">
             <span><strong>${g.bookedSeats}</strong> / ${g.totalSeats} Seats Booked</span>
-            <span style="color:var(--accent-emerald);"><strong>${g.availableSeats}</strong> Available</span>
+            <span style="color:var(--accent-emerald);"><strong>${g.availableSeats}</strong> Seats Left</span>
           </div>
         </div>
       `).join('');
     }
 
     const tbody = document.getElementById('flightManifestTbody');
-    if (tbody) {
+    if (tbody && d.manifest) {
       if (d.manifest.length === 0) {
         tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No passengers in flight manifest.</td></tr>';
       } else {
         tbody.innerHTML = d.manifest.map(p => `
           <tr>
-            <td><strong>${p.voucherId}</strong></td>
-            <td>${p.name}</td>
-            <td>${p.passportNumber}</td>
+            <td>
+              <a href="/vouchers/${p.voucherId}.pdf" target="_blank" style="color:var(--accent-cyan); font-weight:700; text-decoration:none;" title="View PDF Voucher">
+                <i class="fa-solid fa-file-pdf" style="color:var(--accent-rose);"></i> ${p.voucherId}
+              </a>
+            </td>
+            <td><strong>${p.name}</strong></td>
+            <td><strong style="font-family:monospace; color:var(--accent-cyan);">${p.passportNumber}</strong></td>
             <td>${p.dob}</td>
             <td>${p.expiryDate}</td>
             <td>${p.gender}</td>

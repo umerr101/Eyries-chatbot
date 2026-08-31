@@ -336,15 +336,96 @@
 
         <!-- ── TAB 6: CASHFLOW & FINANCE ──────────────────────── -->
         <section id="tab-cashflow" class="tab-pane">
-          <div id="cashflowContent" class="p-4">
-            <div class="text-muted">Loading financial accounts...</div>
+          <!-- Summary Cards -->
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-icon icon-amber"><i class="fa-solid fa-money-bill-wave"></i></div>
+              <div class="kpi-info">
+                <span class="kpi-label">Saudi Cash on Ground</span>
+                <h3 id="cashflowKsaTotal">0 SAR</h3>
+                <small class="kpi-subtext">Hand-delivered in Makkah & Madinah</small>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-icon icon-emerald"><i class="fa-solid fa-building-columns"></i></div>
+              <div class="kpi-info">
+                <span class="kpi-label">Pakistan Bank Deposits</span>
+                <h3 id="cashflowBankTotal">0 PKR</h3>
+                <small class="kpi-subtext">Meezan Bank verified deposits</small>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-icon icon-rose"><i class="fa-solid fa-clock-rotate-left"></i></div>
+              <div class="kpi-info">
+                <span class="kpi-label">Pending Receivables</span>
+                <h3 id="cashflowPendingTotal">0 SAR</h3>
+                <small id="cashflowPendingPkr" class="kpi-subtext">~ 0 PKR awaiting verification</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Financial Ledger Table -->
+          <div class="table-card mt-4">
+            <div class="card-header flex-header">
+              <h4>Multi-Currency Financial Ledger & Accounts Settlement</h4>
+              <button class="action-btn" onclick="loadCashflow()"><i class="fa-solid fa-arrows-rotate"></i> Sync Accounts</button>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Voucher ID</th>
+                    <th>Customer Name</th>
+                    <th>WhatsApp Contact</th>
+                    <th>Amount (SAR)</th>
+                    <th>Amount (PKR)</th>
+                    <th>Payment Channel</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody id="cashflowTbody">
+                  <tr><td colspan="8" class="text-center py-4 text-muted">Loading financial ledger...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 
         <!-- ── TAB 7: FLIGHT MANIFESTS ────────────────────────── -->
         <section id="tab-flights" class="tab-pane">
-          <div id="flightSeatsContent" class="p-4">
-            <div class="text-muted">Loading flight group seats...</div>
+          <!-- Flight Inventory Grid -->
+          <div id="flightGroupsGrid" class="occupancy-grid">
+            <div class="text-center py-4 text-muted" style="grid-column:1/-1;">Loading pre-purchased flight group seats...</div>
+          </div>
+
+          <!-- Flight Passenger Manifest Table -->
+          <div class="table-card mt-4">
+            <div class="card-header flex-header">
+              <h4>Airline Passenger Manifest & PNR Allocations</h4>
+              <button class="action-btn" onclick="loadFlightSeats()"><i class="fa-solid fa-rotate-right"></i> Refresh Manifest</button>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Voucher ID</th>
+                    <th>Passenger Full Name</th>
+                    <th>Passport No</th>
+                    <th>Date of Birth</th>
+                    <th>Passport Expiry</th>
+                    <th>Gender</th>
+                    <th>Sector</th>
+                    <th>Flight Date</th>
+                  </tr>
+                </thead>
+                <tbody id="flightManifestTbody">
+                  <tr><td colspan="8" class="text-center py-4 text-muted">Loading flight passenger manifest...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 
