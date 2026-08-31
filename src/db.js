@@ -6,7 +6,60 @@
 const fs   = require('fs');
 const path = require('path');
 
-const FILE_PATH = path.join(__dirname, '..', 'sessions.json');
+const clientId = process.env.CLIENT_ID || 'default';
+const FILE_PATH = path.join(__dirname, '..', clientId === 'default' ? 'sessions.json' : `sessions_${clientId}.json`);
+
+function syncPassportsDbOrders(ordersObj) {
+  try {
+    const pyPath = path.join(__dirname, 'dbPassportsSync.py');
+    if (!fs.existsSync(pyPath)) return ordersObj;
+
+    const { execSync } = require('child_process');
+    const out = execSync(`python "${pyPath}"`, { timeout: 4000 }).toString();
+    const records = JSON.parse(out || '[]');
+
+    for (const rec of records) {
+      const vId = rec.requestId;
+      if (vId) {
+        const isSixSigmaOrder = vId.startsWith('SST-');
+        const isCurrentClientSixSigma = clientId === 'six_sigma';
+
+        // Filter orders by client prefix if applicable
+        if (isSixSigmaOrder && !isCurrentClientSixSigma && clientId !== 'default') continue;
+
+        if (!ordersObj[vId]) {
+          ordersObj[vId] = {
+            voucherId: vId,
+            customerPhone: rec.customerPhone || '923180978480@c.us',
+            status: (rec.status || '').toUpperCase() === 'CONFIRMED' ? 'APPROVED' : ((rec.status || '').toUpperCase() || 'APPROVED'),
+            sessionData: {
+              flow: 'VISA',
+              step: 'PAYMENT',
+              familyHeadName: `${rec.firstName || ''} ${rec.lastName || ''}`.trim() || 'Guest Head',
+              passengerCount: 1,
+              finalVisaRate: 790,
+              totalSar: 790,
+              totalPkr: 58855,
+              paymentType: 'BANK_DEPOSIT',
+              passportData: {
+                firstName: rec.firstName,
+                lastName: rec.lastName,
+                passportNumber: rec.passportNumber,
+                nationality: rec.nationality,
+                dob: rec.dob,
+                issueDate: rec.issueDate,
+                expiryDate: rec.expiryDate
+              }
+            },
+            createdAt: new Date(rec.createdAt || Date.now()).getTime() || Date.now(),
+            lastUpdated: Date.now()
+          };
+        }
+      }
+    }
+  } catch (_) {}
+  return ordersObj;
+}
 
 function loadSessions() {
   try {
@@ -34,6 +87,8 @@ let store = loadSessions();
 if (!store._orders) {
   store._orders = {};
 }
+
+syncPassportsDbOrders(store._orders);
 
 const db = {
   exec: () => {}, // Compatibility stub
@@ -109,6 +164,7 @@ const db = {
 
   getOrder: (voucherId) => {
     if (!voucherId) return null;
+    syncPassportsDbOrders(store._orders);
     const vIdUpper = voucherId.toUpperCase().trim();
     for (const [id, order] of Object.entries(store._orders || {})) {
       if (id.toUpperCase().trim() === vIdUpper) {
@@ -120,6 +176,7 @@ const db = {
 
   getLatestPendingOrder: (customerPhone) => {
     if (!customerPhone) return null;
+    syncPassportsDbOrders(store._orders);
     const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
     let latest = null;
 
@@ -137,7 +194,7 @@ const db = {
     return latest;
   },
 
-    updateOrderStatus: (voucherId, newStatus, extraData = {}) => {
+  updateOrderStatus: (voucherId, newStatus, extraData = {}) => {
     const order = db.getOrder(voucherId);
     if (!order) return false;
     order.status = newStatus;
@@ -148,6 +205,7 @@ const db = {
   },
 
   getBookingOrders: () => {
+    syncPassportsDbOrders(store._orders);
     return Object.values(store._orders || {});
   }
 };
