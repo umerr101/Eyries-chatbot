@@ -164,15 +164,19 @@ const SESSION_PATH = path.resolve(`.wwebjs_auth_${clientId}`);
 
 // ── Clean stale lock files from LocalAuth data folder on startup ──
 try {
-  const sessionDataDir = path.join(SESSION_PATH, `session-${clientId}`);
-  if (fs.existsSync(sessionDataDir)) {
-    ['lockfile', 'SingletonLock', 'SingletonCookie', 'SingletonSocket'].forEach(file => {
-      const lockPath = path.join(sessionDataDir, file);
-      if (fs.existsSync(lockPath)) {
-        try { fs.unlinkSync(lockPath); } catch (_) {}
+  function removeLockFilesRecursively(dir) {
+    if (!fs.existsSync(dir)) return;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        removeLockFilesRecursively(fullPath);
+      } else if (['lockfile', 'SingletonLock', 'SingletonCookie', 'SingletonSocket', 'DevToolsActivePort'].includes(entry.name)) {
+        try { fs.unlinkSync(fullPath); } catch (_) {}
       }
-    });
+    }
   }
+  removeLockFilesRecursively(SESSION_PATH);
 } catch (_) {}
 
 // ── Locate installed Chrome ────────────────────────────────────
