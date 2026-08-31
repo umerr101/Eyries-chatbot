@@ -14,6 +14,7 @@ const { handlePackageFlow }    = require('./flows/packageFlow');
 const { handleStepBack }       = require('./stepBackHandler');
 const { extractPassportData, extractTicketData }  = require('./ocr/passport');
 const msg                      = require('./utils/messageBuilder');
+const { generateReasoningReply } = require('./ai/reasoningBrain');
 
 /**
  * Main router function. Takes phone number, raw message body, and optional media object.
@@ -34,6 +35,12 @@ async function routeMessage(phone, body, media) {
   // ── Global Step Back Command ('0' or 'BACK') ───────────────
   if (text === '0' || text === 'BACK' || text === 'GO BACK' || text === 'رجوع' || text === 'واپس') {
     return handleStepBack(phone);
+  }
+
+  // ── Operator Live Human Takeover Guard ────────────────────
+  if (session.humanTakeover) {
+    console.log(`[Router] Human Takeover is active for ${phone}. Bot auto-reply paused.`);
+    return null;
   }
 
   // Re-read session after any potential reset above so flow checks are accurate
@@ -165,6 +172,21 @@ async function routeMessage(phone, body, media) {
   // ── FLOW: Transport ───────────────────────────────────────
   if (session.flow === 'TRANSPORT') {
     return handleTransportFlow(phone, session, body);
+  }
+
+  // ── AI LLM Reasoning Brain Fallback ──────────────────────────
+  if (body && body.trim().length > 3 && !isMediaUpload) {
+    try {
+      console.log(`[Router] Routing natural query to AI Reasoning Brain for ${phone}...`);
+      const { getClientConfig } = require('./multiTenantConfig');
+      const clientConfig = getClientConfig();
+      const aiReply = await generateReasoningReply(body.trim(), [], session, clientConfig);
+      if (aiReply) {
+        return aiReply + `\n\n_Type *MENU* at any time to return to main options._`;
+      }
+    } catch (aiErr) {
+      console.error('[Router AI Error]:', aiErr.message);
+    }
   }
 
   // ── Fallback ──────────────────────────────────────────────
