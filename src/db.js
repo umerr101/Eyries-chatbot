@@ -137,7 +137,7 @@ const db = {
     return latest;
   },
 
-  updateOrderStatus: (voucherId, newStatus, extraData = {}) => {
+    updateOrderStatus: (voucherId, newStatus, extraData = {}) => {
     const order = db.getOrder(voucherId);
     if (!order) return false;
     order.status = newStatus;
@@ -145,6 +145,10 @@ const db = {
     Object.assign(order.sessionData, extraData);
     saveSessions(store);
     return true;
+  },
+
+  getBookingOrders: () => {
+    return Object.values(store._orders || {});
   }
 };
 

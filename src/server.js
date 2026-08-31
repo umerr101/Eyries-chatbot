@@ -342,4 +342,14 @@ function getIO() {
   return io;
 }
 
-module.exports = { initServer, getIO };
+function emitSocketEvent(eventName, payload) {
+  if (io) {
+    try {
+      io.emit(eventName, payload);
+    } catch (err) {
+      console.warn('[Socket.io] Error emitting event:', err.message);
+    }
+  }
+}
+
+module.exports = { initServer, getIO, emitSocketEvent };

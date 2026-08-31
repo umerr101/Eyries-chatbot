@@ -199,10 +199,28 @@ function getCalendarTokenData(token) {
   return data;
 }
 
+function getAllSessions() {
+  const stmt = db.prepare('SELECT phone, data, last_activity FROM sessions');
+  const rows = stmt.all();
+  const result = {};
+  for (const r of rows) {
+    try {
+      result[r.phone] = JSON.parse(r.data);
+    } catch (_) {}
+  }
+  return result;
+}
+
+function getBookingOrders() {
+  return db.getBookingOrders ? db.getBookingOrders() : [];
+}
+
 module.exports = {
   getSession,
   resetSession,
   updateSession,
+  getAllSessions,
+  getBookingOrders,
   findSessionByVoucherId,
   findSessionByPhone,
   createCalendarToken,
