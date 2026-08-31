@@ -315,11 +315,15 @@ function initServer(client, app, server) {
           return false;
         }
 
-        // 2. Split catalog name into slashes or key segments
+        // 2. Exact clean substring match
+        if (cleanCat.includes(cleanVouch) || cleanVouch.includes(cleanCat)) {
+          return true;
+        }
+
+        // 3. Split catalog name into slashes or key segments
         const catSegments = catalogHotelName.toLowerCase().split('/').map(s => s.trim());
-        
         for (const seg of catSegments) {
-          const segWords = seg.split(/[^a-z0-9]+/).filter(w => w.length > 2 && !['hotel', 'towers', 'road', 'side', 'similar', 'shuttle', 'khalil'].includes(w));
+          const segWords = seg.split(/[^a-z0-9]+/).filter(w => w.length > 2 && !['hotel', 'towers', 'road', 'side', 'similar', 'shuttle', 'khalil', 'rose', 'fakhama'].includes(w));
           if (segWords.length === 0) continue;
           
           const matchesAll = segWords.every(w => cleanVouch.includes(w));
