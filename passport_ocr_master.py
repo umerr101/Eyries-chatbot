@@ -16,9 +16,10 @@ import json
 import re
 import sqlite3
 import urllib.request
+import urllib.parse
 import base64
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List, Union, Tuple
+from typing import Dict, Any, Optional
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -608,7 +609,7 @@ def run_gemini_vision_ocr(image_bytes: bytes, api_key: Optional[str] = None) -> 
         Ensure date fields (date_of_birth, date_of_issue, date_of_expiry) are strictly formatted as YYYY-MM-DD.
         """
 
-        candidate_models = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest']
+        candidate_models = ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-pro-latest', 'gemini-3-flash-preview']
         response = None
         import time
 
@@ -889,7 +890,7 @@ def run_gemini_arabic_translation(english_data: Dict[str, Any], api_key: Optiona
         Nationality: {nat}
         """
 
-        candidate_models = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest']
+        candidate_models = ['gemini-flash-latest', 'gemini-flash-lite-latest']
         response = None
         for k in keys:
             key_exhausted = False
@@ -1238,7 +1239,7 @@ def run_gemini_ticket_ocr(file_bytes: bytes, mime_type: str = "image/jpeg", api_
         - Format all dates strictly as YYYY-MM-DD.
         """
 
-        candidate_models = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest']
+        candidate_models = ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-pro-latest', 'gemini-3-flash-preview']
         response = None
         for k in keys:
             key_exhausted = False
@@ -1445,68 +1446,12 @@ def process_ticket_booking_image(file_bytes: bytes, is_pdf: bool = False) -> Dic
         "whatsapp_message": whatsapp_msg
     }
 
-def run_ai_reasoning(user_message: str, session_context_str: str = "{}", agency_name: str = "Eyries Holidays") -> Optional[str]:
-    """Runs LLM reasoning on natural conversational queries using Gemini Vision SDK."""
-    key = GEMINI_API_KEY
-    if not key:
-        return None
-    try:
-        from google import genai
-        client = genai.Client(api_key=key)
-
-        system_instruction = f"""
-You are the AI Travel Assistant & Co-Pilot for "{agency_name}", a premier Hajj & Umrah travel agency based in Pakistan.
-Your primary role is to assist pilgrims with empathy, high accuracy, and deep knowledge of Hajj & Umrah travel services.
-
-KEY KNOWLEDGE BASE & BUSINESS RULES:
-1. Agency Brand: "{agency_name}" | Helpline: +923180978480 | Account Title: "{agency_name}" (Head Office, Islamabad).
-2. Pakistani Airline Surcharge (+90 SAR): Flights with Pakistani airlines (PIA, Airblue, Serene Air, Air Sial, Fly Jinnah) arrive at Jeddah Hajj Terminal and incur an additional +90 SAR per person surcharge.
-3. Passport Validity Rule: All passports MUST have at least 6 months (180 days) validity remaining from the travel date. If less, inform the user they must renew their passport first.
-4. Transport Vehicles: Sedan (4 seats), GMC/SUV (7 seats), HiAce/Van (10-14 seats), Coaster/Bus (30-47 seats).
-5. Visa Processing Time: 1-2 business days after payment confirmation. Passports are verified and sent forward for official processing.
-6. Multilingual Requirement: Respond in the EXACT language used by the customer (Roman Urdu, Urdu script, English, or Arabic).
-
-RESPONSE STYLE:
-- Warm, polite, respectful, and professional. Use appropriate emojis (🌙, 🕋, 🕌, ✈️, 🚗, 📄).
-- Format responses cleanly for WhatsApp using *bold*, _italic_, and bullet points.
-"""
-
-        prompt = f"""
-[SYSTEM INSTRUCTION]
-{system_instruction}
-
-[USER SESSION CONTEXT]
-{session_context_str}
-
-[INCOMING CUSTOMER MESSAGE]
-"{user_message}"
-
-Generate a helpful, accurate, and concise WhatsApp reply.
-"""
-
-        candidate_models = ['gemini-3.6-flash', 'gemini-2.0-flash', 'gemini-flash-latest']
-        for m in candidate_models:
-            try:
-                response = client.models.generate_content(
-                    model=m,
-                    contents=prompt
-                )
-                if response and response.text:
-                    return response.text.strip()
-            except Exception as err:
-                sys.stderr.write(f"Reasoning Model {m} error: {err}\n")
-                continue
-    except Exception as e:
-        sys.stderr.write(f"AI Reasoning Exception: {e}\n")
-
-    return None
-
 # ==============================================================================
 # COMMAND LINE INTERFACE (For Node.js Child Process Integration)
 # ==============================================================================
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print(json.dumps({"error": "No action specified. Use 'ocr <image_path>', 'ticket_ocr <image_path>', 'confirm <passport_number> [json_data]', or 'reason <message> [session_json] [agency_name]'"}))
+        print(json.dumps({"error": "No action specified. Use 'ocr <image_path>', 'ticket_ocr <image_path>', or 'confirm <passport_number> [json_data]'"}))
         sys.exit(1)
 
     action = sys.argv[1].lower()
@@ -1568,16 +1513,6 @@ if __name__ == "__main__":
                 direct_passengers = None
         excel_p = export_confirmed_passports_to_excel(req_id, direct_passengers=direct_passengers)
         print(json.dumps({"success": True, "excel_file": excel_p}))
-
-    elif action == "reason":
-        if len(sys.argv) < 3:
-            print(json.dumps({"error": "User message required for reasoning"}))
-            sys.exit(1)
-        user_msg = sys.argv[2]
-        session_ctx = sys.argv[3] if len(sys.argv) >= 4 else "{}"
-        agency = sys.argv[4] if len(sys.argv) >= 5 else "Eyries Holidays"
-        res_reply = run_ai_reasoning(user_msg, session_context_str=session_ctx, agency_name=agency)
-        print(json.dumps({"success": True, "reply": res_reply}))
 
     else:
         print(json.dumps({"error": f"Unknown action: {action}"}))

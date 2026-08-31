@@ -138,19 +138,9 @@ async function exportExcelForWindow(requestIdOrPhone = null, passengersList = nu
   return await runPython(args);
 }
 
-async function runAIReasoningWithGemini(userMessage, sessionContext = {}, agencyName = 'Eyries Holidays') {
-  const args = ['reason', userMessage, JSON.stringify(sessionContext), agencyName];
-  const result = await runPython(args);
-  if (result && result.success && result.reply) {
-    return result.reply;
-  }
-  return null;
-}
-
 module.exports = {
   processPassportWithGemini,
   processTicketWithGemini,
   confirmPassportWithGemini,
   exportExcelForWindow,
-  runAIReasoningWithGemini,
 };
