@@ -25,7 +25,23 @@ const itinerariesDir = path.resolve(__dirname, '..', 'itineraries');
 if (!fs.existsSync(itinerariesDir)) {
   fs.mkdirSync(itinerariesDir, { recursive: true });
 }
-app.use(express.json());
+app.get(['/vouchers/:filename', '/vouchers/:filename.pdf'], (req, res) => {
+  let rawFilename = req.params.filename.replace(/\.pdf$/i, '');
+  const candidates = [
+    path.join(itinerariesDir, `Voucher_${rawFilename}.pdf`),
+    path.join(itinerariesDir, `${rawFilename}.pdf`),
+    path.join(itinerariesDir, rawFilename),
+    path.join(itinerariesDir, `Voucher_${rawFilename}`)
+  ];
+
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      return res.sendFile(p);
+    }
+  }
+
+  res.status(404).send(`Voucher ${rawFilename} not found.`);
+});
 app.use('/vouchers', express.static(itinerariesDir));
 
 // Serve visual calendar popup HTML (supports clean tokenized URLs e.g. /c/a9f3b2 or /calendar)
