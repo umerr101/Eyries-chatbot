@@ -403,14 +403,15 @@ function normalizeDateStr(dStr) {
   return dStr;
 }
 
-  // 9. Daily Movements Endpoint (Check-in & Check-out Date Search)
+  // 9. Daily Movements Endpoint (Lists all movements by default; supports optional date range & city filters)
   app.get(['/api/reports/daily-movements', '/api/reports/movements'], (req, res) => {
     try {
-      const rawInDate = req.query.checkInDate || req.query.date || '2026-09-01';
-      const rawOutDate = req.query.checkOutDate || req.query.date || '2026-09-09';
+      const rawInDate = (req.query.checkInDate || '').trim();
+      const rawOutDate = (req.query.checkOutDate || '').trim();
+      const cityFilter = (req.query.city || 'ALL').toUpperCase().trim();
       
-      const targetCheckIn = normalizeDateStr(rawInDate);
-      const targetCheckOut = normalizeDateStr(rawOutDate);
+      const targetCheckIn = rawInDate ? normalizeDateStr(rawInDate) : null;
+      const targetCheckOut = rawOutDate ? normalizeDateStr(rawOutDate) : null;
 
       const orders = getBookingOrders();
 
@@ -422,56 +423,68 @@ function normalizeDateStr(dStr) {
         const guestName = s.familyHeadName || (s.passportData ? `${s.passportData.firstName} ${s.passportData.lastName}` : 'Guest');
 
         // Check Makkah stay
-        if (s.makkahBooking) {
+        if (s.makkahBooking && (cityFilter === 'ALL' || cityFilter === 'MAKKAH')) {
           const mkIn = normalizeDateStr(s.makkahBooking.checkIn);
           const mkOut = normalizeDateStr(s.makkahBooking.checkOut);
 
-          if (mkIn === targetCheckIn) {
+          const matchesCheckIn = !targetCheckIn || mkIn === targetCheckIn;
+          const matchesCheckOut = !targetCheckOut || mkOut === targetCheckOut;
+
+          if (matchesCheckIn) {
             checkIns.push({
               voucherId: o.voucherId,
               guestName,
               city: 'Makkah',
               hotelName: s.makkahBooking.hotelName,
               roomType: s.makkahBooking.roomType || 'Sharing Room',
-              nights: s.makkahBooking.nights || 8,
+              checkIn: mkIn,
+              checkOut: mkOut,
               pax: s.passengerCount || 1
             });
           }
-          if (mkOut === targetCheckOut) {
+          if (matchesCheckOut) {
             checkOuts.push({
               voucherId: o.voucherId,
               guestName,
               city: 'Makkah',
               hotelName: s.makkahBooking.hotelName,
               nextDestination: s.madinahBooking ? `Transfer to ${s.madinahBooking.hotelName} (Madinah)` : 'Departure / Flight Home',
+              checkIn: mkIn,
+              checkOut: mkOut,
               pax: s.passengerCount || 1
             });
           }
         }
 
         // Check Madinah stay
-        if (s.madinahBooking) {
+        if (s.madinahBooking && (cityFilter === 'ALL' || cityFilter === 'MADINAH')) {
           const mdIn = normalizeDateStr(s.madinahBooking.checkIn);
           const mdOut = normalizeDateStr(s.madinahBooking.checkOut);
 
-          if (mdIn === targetCheckIn) {
+          const matchesCheckIn = !targetCheckIn || mdIn === targetCheckIn;
+          const matchesCheckOut = !targetCheckOut || mdOut === targetCheckOut;
+
+          if (matchesCheckIn) {
             checkIns.push({
               voucherId: o.voucherId,
               guestName,
               city: 'Madinah',
               hotelName: s.madinahBooking.hotelName,
               roomType: s.madinahBooking.roomType || 'Sharing Room',
-              nights: s.madinahBooking.nights || 6,
+              checkIn: mdIn,
+              checkOut: mdOut,
               pax: s.passengerCount || 1
             });
           }
-          if (mdOut === targetCheckOut) {
+          if (matchesCheckOut) {
             checkOuts.push({
               voucherId: o.voucherId,
               guestName,
               city: 'Madinah',
               hotelName: s.madinahBooking.hotelName,
               nextDestination: 'Departure / Flight Home',
+              checkIn: mdIn,
+              checkOut: mdOut,
               pax: s.passengerCount || 1
             });
           }
@@ -480,8 +493,9 @@ function normalizeDateStr(dStr) {
 
       return res.json({
         success: true,
-        checkInDate: targetCheckIn,
-        checkOutDate: targetCheckOut,
+        checkInDate: targetCheckIn || 'ALL',
+        checkOutDate: targetCheckOut || 'ALL',
+        city: cityFilter,
         data: {
           checkIns,
           checkOuts,

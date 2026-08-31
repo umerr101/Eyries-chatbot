@@ -240,6 +240,27 @@ function initEventHandlers() {
     searchMovementsBtn.addEventListener('click', loadDailyMovements);
   }
 
+  const clearMovementsBtn = document.getElementById('clearMovementsBtn');
+  if (clearMovementsBtn) {
+    clearMovementsBtn.addEventListener('click', () => {
+      const inInput = document.getElementById('movementCheckInInput');
+      const outInput = document.getElementById('movementCheckOutInput');
+      if (inInput) inInput.value = '';
+      if (outInput) outInput.value = '';
+      loadDailyMovements();
+    });
+  }
+
+  // Movement City Pills
+  document.querySelectorAll('[data-movement-city]').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('[data-movement-city]').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      currentMovementCityFilter = pill.getAttribute('data-movement-city');
+      loadDailyMovements();
+    });
+  });
+
   const inInput = document.getElementById('movementCheckInInput');
   const outInput = document.getElementById('movementCheckOutInput');
   if (inInput) {
@@ -1185,25 +1206,22 @@ function closeHotelModal() {
   closeActiveModal();
 }
 
+let currentMovementCityFilter = 'ALL';
+
 // ── 8. Daily Movements ───────────────────────────────────────
 async function loadDailyMovements() {
   try {
     const inInput = document.getElementById('movementCheckInInput');
     const outInput = document.getElementById('movementCheckOutInput');
 
-    let inVal = inInput ? inInput.value : '';
-    let outVal = outInput ? outInput.value : '';
+    let inVal = inInput ? inInput.value.trim() : '';
+    let outVal = outInput ? outInput.value.trim() : '';
 
-    if (!inVal) {
-      inVal = '2026-09-01';
-      if (inInput) inInput.value = inVal;
-    }
-    if (!outVal) {
-      outVal = '2026-09-09';
-      if (outInput) outInput.value = outVal;
-    }
+    let url = `/api/reports/daily-movements?city=${currentMovementCityFilter}`;
+    if (inVal) url += `&checkInDate=${inVal}`;
+    if (outVal) url += `&checkOutDate=${outVal}`;
 
-    const res = await fetch(`/api/reports/daily-movements?checkInDate=${inVal}&checkOutDate=${outVal}`);
+    const res = await fetch(url);
     const json = await res.json();
     if (!json.success) return;
 
@@ -1218,7 +1236,7 @@ async function loadDailyMovements() {
 
     if (checkInsTbody) {
       if (!d.checkIns || d.checkIns.length === 0) {
-        checkInsTbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">No scheduled check-ins found for check-in date <strong>${inVal}</strong>.</td></tr>`;
+        checkInsTbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">No scheduled check-ins found matching criteria.</td></tr>`;
       } else {
         checkInsTbody.innerHTML = d.checkIns.map(c => `
           <tr>
@@ -1230,9 +1248,9 @@ async function loadDailyMovements() {
             <td><strong>${c.guestName}</strong></td>
             <td>${c.hotelName} (${c.city})</td>
             <td>${c.roomType}</td>
-            <td><strong>${c.nights}</strong> Nights</td>
+            <td><strong style="color:var(--accent-emerald);">${c.checkIn || '-'}</strong></td>
+            <td><strong style="color:var(--accent-rose);">${c.checkOut || '-'}</strong></td>
             <td>${c.pax} Pax</td>
-            <td><span class="badge-status status-approved">SCHEDULED CHECK-IN</span></td>
           </tr>
         `).join('');
       }
@@ -1240,7 +1258,7 @@ async function loadDailyMovements() {
 
     if (checkOutsTbody) {
       if (!d.checkOuts || d.checkOuts.length === 0) {
-        checkOutsTbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">No scheduled check-outs found for check-out date <strong>${outVal}</strong>.</td></tr>`;
+        checkOutsTbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">No scheduled check-outs found matching criteria.</td></tr>`;
       } else {
         checkOutsTbody.innerHTML = d.checkOuts.map(c => `
           <tr>
@@ -1252,8 +1270,9 @@ async function loadDailyMovements() {
             <td><strong>${c.guestName}</strong></td>
             <td>${c.hotelName} (${c.city})</td>
             <td>${c.nextDestination}</td>
+            <td><strong style="color:var(--accent-emerald);">${c.checkIn || '-'}</strong></td>
+            <td><strong style="color:var(--accent-rose);">${c.checkOut || '-'}</strong></td>
             <td>${c.pax} Pax</td>
-            <td><span class="badge-status status-pending">CHECK-OUT / DEPARTURE</span></td>
           </tr>
         `).join('');
       }

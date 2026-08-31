@@ -325,23 +325,28 @@
         <section id="tab-movements" class="tab-pane">
           <div class="table-card">
             <div class="card-header flex-header" style="gap:16px; flex-wrap:wrap; padding: 20px 24px;">
-              <div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
                 <h4>Daily Movements Desk</h4>
-                <p style="font-size:12px; color:var(--text-muted);">Check-in & Check-out passenger roster search</p>
+                <div class="movement-city-pills" style="display:flex; gap:8px;">
+                  <button class="filter-pill active" data-movement-city="ALL">All Cities</button>
+                  <button class="filter-pill" data-movement-city="MAKKAH">🕋 Makkah</button>
+                  <button class="filter-pill" data-movement-city="MADINAH">🕌 Madinah</button>
+                </div>
               </div>
               
               <div style="display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap;">
                 <div style="display:flex; flex-direction:column; gap:4px;">
-                  <label style="font-size:11.5px; color:var(--text-muted); font-weight:600;">🕋 Check-in Date</label>
-                  <input type="date" id="movementCheckInInput" class="form-date-input" value="2026-09-01">
+                  <label style="font-size:11.5px; color:var(--text-muted); font-weight:600;">🕋 Check-in Date (Optional)</label>
+                  <input type="date" id="movementCheckInInput" class="form-date-input" placeholder="Select check-in">
                 </div>
 
                 <div style="display:flex; flex-direction:column; gap:4px;">
-                  <label style="font-size:11.5px; color:var(--text-muted); font-weight:600;">🕌 Check-out Date</label>
-                  <input type="date" id="movementCheckOutInput" class="form-date-input" value="2026-09-09">
+                  <label style="font-size:11.5px; color:var(--text-muted); font-weight:600;">🕌 Check-out Date (Optional)</label>
+                  <input type="date" id="movementCheckOutInput" class="form-date-input" placeholder="Select check-out">
                 </div>
 
-                <button id="searchMovementsBtn" class="action-btn primary-btn"><i class="fa-solid fa-magnifying-glass"></i> Search Movements</button>
+                <button id="searchMovementsBtn" class="action-btn primary-btn"><i class="fa-solid fa-magnifying-glass"></i> Filter</button>
+                <button id="clearMovementsBtn" class="action-btn" style="background:rgba(255,255,255,0.06); color:var(--text-muted);"><i class="fa-solid fa-rotate-left"></i> Show All</button>
               </div>
             </div>
 
@@ -360,13 +365,13 @@
                         <th>Passenger / Head Name</th>
                         <th>Hotel & City</th>
                         <th>Room Category</th>
-                        <th>Duration</th>
+                        <th>Check-in Date</th>
+                        <th>Check-out Date</th>
                         <th>Pax</th>
-                        <th>Status</th>
                       </tr>
                     </thead>
                     <tbody id="checkInsTbody">
-                      <tr><td colspan="7" class="text-center py-4 text-muted">Select check-in date and click Search.</td></tr>
+                      <tr><td colspan="7" class="text-center py-4 text-muted">Loading check-in roster...</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -386,12 +391,13 @@
                         <th>Passenger / Head Name</th>
                         <th>Hotel & City</th>
                         <th>Transfer / Next Destination</th>
+                        <th>Check-in Date</th>
+                        <th>Check-out Date</th>
                         <th>Pax</th>
-                        <th>Status</th>
                       </tr>
                     </thead>
                     <tbody id="checkOutsTbody">
-                      <tr><td colspan="6" class="text-center py-4 text-muted">Select check-out date and click Search.</td></tr>
+                      <tr><td colspan="7" class="text-center py-4 text-muted">Loading check-out roster...</td></tr>
                     </tbody>
                   </table>
                 </div>
