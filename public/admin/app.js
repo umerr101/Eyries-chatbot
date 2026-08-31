@@ -161,7 +161,6 @@ function refreshAllData() {
 function initEventHandlers() {
   document.getElementById('refreshDataBtn').addEventListener('click', () => {
     refreshAllData();
-    showToast('Dashboard data refreshed', 'info');
   });
 
   document.getElementById('sendOperatorMessageBtn').addEventListener('click', sendOperatorMessage);
@@ -1045,14 +1044,24 @@ function exportReport(type) {
 function showToast(message, type = 'info') {
   const container = document.getElementById('toastContainer');
   if (!container) return;
+  
+  const iconMap = {
+    success: 'fa-circle-check',
+    error: 'fa-circle-xmark',
+    info: 'fa-circle-info',
+    warning: 'fa-triangle-exclamation'
+  };
+
+  const icon = iconMap[type] || 'fa-circle-info';
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
-  toast.innerHTML = `<i class="fa-solid fa-circle-info"></i> <span>${escapeHtml(message)}</span>`;
+  toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${escapeHtml(message)}</span>`;
   container.appendChild(toast);
+  
   setTimeout(() => {
-    toast.style.opacity = '0';
+    toast.classList.add('hide');
     setTimeout(() => toast.remove(), 300);
-  }, 4000);
+  }, 3500);
 }
 
 function escapeHtml(str) {
