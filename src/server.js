@@ -302,32 +302,49 @@ function initServer(client, app, server) {
 
       const orders = getBookingOrders();
 
-      const formatHotelList = (list, city) => list.map(h => {
-        const hotelNameLower = (h.name || '').toLowerCase().trim();
-        const hotelFirstWord = hotelNameLower.split(' ')[0];
+      function isHotelMatch(catalogHotelName, voucherHotelName) {
+        if (!catalogHotelName || !voucherHotelName) return false;
+        
+        const cleanCat = catalogHotelName.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+        const cleanVouch = voucherHotelName.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
 
+        // 1. Number check (e.g. 'safeer sakni 1' vs 'safeer sakni 2')
+        const catDigit = cleanCat.match(/\b\d+\b/);
+        const vouchDigit = cleanVouch.match(/\b\d+\b/);
+        if (catDigit && vouchDigit && catDigit[0] !== vouchDigit[0]) {
+          return false;
+        }
+
+        // 2. Split catalog name into slashes or key segments
+        const catSegments = catalogHotelName.toLowerCase().split('/').map(s => s.trim());
+        
+        for (const seg of catSegments) {
+          const segWords = seg.split(/[^a-z0-9]+/).filter(w => w.length > 2 && !['hotel', 'towers', 'road', 'side', 'similar', 'shuttle', 'khalil'].includes(w));
+          if (segWords.length === 0) continue;
+          
+          const matchesAll = segWords.every(w => cleanVouch.includes(w));
+          if (matchesAll) return true;
+        }
+
+        return false;
+      }
+
+      const formatHotelList = (list, city) => list.map(h => {
         const matchingBookings = orders.filter(o => {
           const s = o.sessionData || {};
-          const mkName = (s.makkahBooking?.hotelName || '').toLowerCase().trim();
-          const mdName = (s.madinahBooking?.hotelName || '').toLowerCase().trim();
-          const ctName = (s.cityBooking?.hotelName || '').toLowerCase().trim();
-
-          const isMakkahMatch = mkName && (mkName.includes(hotelFirstWord) || hotelNameLower.includes(mkName.split(' ')[0]));
-          const isMadinahMatch = mdName && (mdName.includes(hotelFirstWord) || hotelNameLower.includes(mdName.split(' ')[0]));
-          const isCityMatch = ctName && (ctName.includes(hotelFirstWord) || hotelNameLower.includes(ctName.split(' ')[0]));
-
-          return isMakkahMatch || isMadinahMatch || isCityMatch;
+          const targetVoucherHotel = city === 'Makkah' ? s.makkahBooking?.hotelName : s.madinahBooking?.hotelName;
+          return isHotelMatch(h.name, targetVoucherHotel);
         }).map(o => {
           const s = o.sessionData || {};
-          const bkg = (city === 'Makkah' ? s.makkahBooking : s.madinahBooking) || s.makkahBooking || s.madinahBooking || {};
+          const bkg = (city === 'Makkah' ? s.makkahBooking : s.madinahBooking) || {};
           return {
             voucherId: o.voucherId,
             guestName: s.familyHeadName || 'Guest',
             phone: o.customerPhone ? o.customerPhone.replace('@c.us', '') : '',
-            checkIn: bkg.checkIn || s.checkInPretty || '02-Sep-26',
-            checkOut: bkg.checkOut || s.checkOutPretty || '10-Sep-26',
-            nights: bkg.nights || s.nights || 8,
-            roomType: bkg.roomType || s.roomType || 'Sharing Room',
+            checkIn: bkg.checkIn || '02-Sep-26',
+            checkOut: bkg.checkOut || '10-Sep-26',
+            nights: bkg.nights || 8,
+            roomType: bkg.roomType || 'Sharing Room',
             pax: s.passengerCount || 1,
             status: o.status || 'APPROVED'
           };
