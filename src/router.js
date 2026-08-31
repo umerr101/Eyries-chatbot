@@ -100,7 +100,7 @@ async function routeMessage(phone, body, media) {
   }
 
   // ── FLOW: Main Menu ───────────────────────────────────────
-  if (session.flow === 'MAIN_MENU' || !session.flow) {
+  if (session.flow === 'MAIN_MENU') {
     if (text === '1') {
       updateSession(phone, { flow: 'PACKAGE', step: 'PKG_SELECT_TYPE' });
       return msg.packageTypeMenu();
@@ -123,22 +123,6 @@ async function routeMessage(phone, body, media) {
     if (text === '6') {
       return msg.helplineEscalation();
     }
-
-    // Pass natural text query in MAIN_MENU to AI Reasoning Brain
-    if (body && body.trim().length > 3 && !isMediaUpload) {
-      try {
-        console.log(`[Router] Routing natural query in MAIN_MENU to AI Reasoning Brain for ${phone}...`);
-        const { loadClientConfig } = require('./configLoader');
-        const clientConfig = loadClientConfig();
-        const aiReply = await generateReasoningReply(body.trim(), [], session, clientConfig);
-        if (aiReply) {
-          return aiReply + `\n\n_Type *MENU* at any time to return to main options._`;
-        }
-      } catch (aiErr) {
-        console.error('[Router AI Error]:', aiErr.message);
-      }
-    }
-
     return msg.mainMenu();
   }
 
@@ -190,12 +174,12 @@ async function routeMessage(phone, body, media) {
     return handleTransportFlow(phone, session, body);
   }
 
-  // ── AI LLM Reasoning Brain Final Fallback ──────────────────
+  // ── AI LLM Reasoning Brain Fallback ──────────────────────────
   if (body && body.trim().length > 3 && !isMediaUpload) {
     try {
       console.log(`[Router] Routing natural query to AI Reasoning Brain for ${phone}...`);
-      const { loadClientConfig } = require('./configLoader');
-      const clientConfig = loadClientConfig();
+      const { getClientConfig } = require('./multiTenantConfig');
+      const clientConfig = getClientConfig();
       const aiReply = await generateReasoningReply(body.trim(), [], session, clientConfig);
       if (aiReply) {
         return aiReply + `\n\n_Type *MENU* at any time to return to main options._`;
