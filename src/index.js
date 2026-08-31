@@ -150,10 +150,12 @@ const SESSION_PATH = path.resolve(`.wwebjs_auth_${clientId}`);
 try {
   const sessionDataDir = path.join(SESSION_PATH, `session-${clientId}`);
   if (fs.existsSync(sessionDataDir)) {
-    const lockFile = path.join(sessionDataDir, 'lockfile');
-    if (fs.existsSync(lockFile)) {
-      fs.unlinkSync(lockFile);
-    }
+    ['lockfile', 'SingletonLock', 'SingletonCookie', 'SingletonSocket'].forEach(file => {
+      const lockPath = path.join(sessionDataDir, file);
+      if (fs.existsSync(lockPath)) {
+        try { fs.unlinkSync(lockPath); } catch (_) {}
+      }
+    });
   }
 } catch (_) {}
 
