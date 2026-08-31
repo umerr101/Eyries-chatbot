@@ -403,11 +403,15 @@ function normalizeDateStr(dStr) {
   return dStr;
 }
 
-  // 9. Daily Movements Endpoint
+  // 9. Daily Movements Endpoint (Check-in & Check-out Date Search)
   app.get(['/api/reports/daily-movements', '/api/reports/movements'], (req, res) => {
     try {
-      const rawDate = req.query.date || '2026-09-01';
-      const targetDate = normalizeDateStr(rawDate);
+      const rawInDate = req.query.checkInDate || req.query.date || '2026-09-01';
+      const rawOutDate = req.query.checkOutDate || req.query.date || '2026-09-09';
+      
+      const targetCheckIn = normalizeDateStr(rawInDate);
+      const targetCheckOut = normalizeDateStr(rawOutDate);
+
       const orders = getBookingOrders();
 
       const checkIns = [];
@@ -422,7 +426,7 @@ function normalizeDateStr(dStr) {
           const mkIn = normalizeDateStr(s.makkahBooking.checkIn);
           const mkOut = normalizeDateStr(s.makkahBooking.checkOut);
 
-          if (mkIn === targetDate) {
+          if (mkIn === targetCheckIn) {
             checkIns.push({
               voucherId: o.voucherId,
               guestName,
@@ -433,7 +437,7 @@ function normalizeDateStr(dStr) {
               pax: s.passengerCount || 1
             });
           }
-          if (mkOut === targetDate) {
+          if (mkOut === targetCheckOut) {
             checkOuts.push({
               voucherId: o.voucherId,
               guestName,
@@ -450,7 +454,7 @@ function normalizeDateStr(dStr) {
           const mdIn = normalizeDateStr(s.madinahBooking.checkIn);
           const mdOut = normalizeDateStr(s.madinahBooking.checkOut);
 
-          if (mdIn === targetDate) {
+          if (mdIn === targetCheckIn) {
             checkIns.push({
               voucherId: o.voucherId,
               guestName,
@@ -461,7 +465,7 @@ function normalizeDateStr(dStr) {
               pax: s.passengerCount || 1
             });
           }
-          if (mdOut === targetDate) {
+          if (mdOut === targetCheckOut) {
             checkOuts.push({
               voucherId: o.voucherId,
               guestName,
@@ -476,7 +480,8 @@ function normalizeDateStr(dStr) {
 
       return res.json({
         success: true,
-        date: targetDate,
+        checkInDate: targetCheckIn,
+        checkOutDate: targetCheckOut,
         data: {
           checkIns,
           checkOuts,

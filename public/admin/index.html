@@ -324,12 +324,78 @@
         <!-- ── TAB 5: DAILY MOVEMENTS ─────────────────────────── -->
         <section id="tab-movements" class="tab-pane">
           <div class="table-card">
-            <div class="card-header flex-header">
-              <h4>Daily Movements Desk (Check-ins & Transfers)</h4>
-              <input type="date" id="movementDateInput" class="form-date-input">
+            <div class="card-header flex-header" style="gap:16px; flex-wrap:wrap; padding: 20px 24px;">
+              <div>
+                <h4>Daily Movements Desk</h4>
+                <p style="font-size:12px; color:var(--text-muted);">Check-in & Check-out passenger roster search</p>
+              </div>
+              
+              <div style="display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap;">
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:11.5px; color:var(--text-muted); font-weight:600;">🕋 Check-in Date</label>
+                  <input type="date" id="movementCheckInInput" class="form-date-input" value="2026-09-01">
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:11.5px; color:var(--text-muted); font-weight:600;">🕌 Check-out Date</label>
+                  <input type="date" id="movementCheckOutInput" class="form-date-input" value="2026-09-09">
+                </div>
+
+                <button id="searchMovementsBtn" class="action-btn primary-btn"><i class="fa-solid fa-magnifying-glass"></i> Search Movements</button>
+              </div>
             </div>
-            <div id="dailyMovementsContent" class="p-4">
-              <div class="text-muted">Select a date to view arrival, departure, and airport transfer rosters.</div>
+
+            <div class="p-4" style="display:flex; flex-direction:column; gap:24px;">
+              <!-- Check-ins Table Container -->
+              <div class="table-card" style="background:rgba(0,0,0,0.15);">
+                <div class="card-header flex-header">
+                  <h5 style="font-size:14px; font-weight:700; color:var(--accent-emerald);"><i class="fa-solid fa-hotel"></i> Scheduled Check-ins</h5>
+                  <span id="checkInsCountBadge" class="nav-badge">0 Guests</span>
+                </div>
+                <div class="table-responsive">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Voucher ID</th>
+                        <th>Passenger / Head Name</th>
+                        <th>Hotel & City</th>
+                        <th>Room Category</th>
+                        <th>Duration</th>
+                        <th>Pax</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="checkInsTbody">
+                      <tr><td colspan="7" class="text-center py-4 text-muted">Select check-in date and click Search.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Check-outs Table Container -->
+              <div class="table-card" style="background:rgba(0,0,0,0.15);">
+                <div class="card-header flex-header">
+                  <h5 style="font-size:14px; font-weight:700; color:var(--accent-rose);"><i class="fa-solid fa-plane-departure"></i> Scheduled Check-outs & Transfers</h5>
+                  <span id="checkOutsCountBadge" class="nav-badge badge-warning">0 Guests</span>
+                </div>
+                <div class="table-responsive">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Voucher ID</th>
+                        <th>Passenger / Head Name</th>
+                        <th>Hotel & City</th>
+                        <th>Transfer / Next Destination</th>
+                        <th>Pax</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="checkOutsTbody">
+                      <tr><td colspan="6" class="text-center py-4 text-muted">Select check-out date and click Search.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
         </section>

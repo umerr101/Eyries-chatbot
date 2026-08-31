@@ -235,10 +235,18 @@ function initEventHandlers() {
     });
   });
 
-  const dateInput = document.getElementById('movementDateInput');
-  if (dateInput) {
-    dateInput.addEventListener('change', loadDailyMovements);
-    dateInput.addEventListener('input', loadDailyMovements);
+  const searchMovementsBtn = document.getElementById('searchMovementsBtn');
+  if (searchMovementsBtn) {
+    searchMovementsBtn.addEventListener('click', loadDailyMovements);
+  }
+
+  const inInput = document.getElementById('movementCheckInInput');
+  const outInput = document.getElementById('movementCheckOutInput');
+  if (inInput) {
+    inInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadDailyMovements(); });
+  }
+  if (outInput) {
+    outInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadDailyMovements(); });
   }
 }
 
@@ -1180,23 +1188,37 @@ function closeHotelModal() {
 // ── 8. Daily Movements ───────────────────────────────────────
 async function loadDailyMovements() {
   try {
-    const dateInput = document.getElementById('movementDateInput');
-    let dateVal = dateInput ? dateInput.value : '';
-    if (!dateVal) {
-      dateVal = '2026-09-01';
-      if (dateInput) dateInput.value = dateVal;
+    const inInput = document.getElementById('movementCheckInInput');
+    const outInput = document.getElementById('movementCheckOutInput');
+
+    let inVal = inInput ? inInput.value : '';
+    let outVal = outInput ? outInput.value : '';
+
+    if (!inVal) {
+      inVal = '2026-09-01';
+      if (inInput) inInput.value = inVal;
     }
-    const res = await fetch(`/api/reports/daily-movements?date=${dateVal}`);
+    if (!outVal) {
+      outVal = '2026-09-09';
+      if (outInput) outInput.value = outVal;
+    }
+
+    const res = await fetch(`/api/reports/daily-movements?checkInDate=${inVal}&checkOutDate=${outVal}`);
     const json = await res.json();
     if (!json.success) return;
 
     const d = json.data;
     const checkInsTbody = document.getElementById('checkInsTbody');
     const checkOutsTbody = document.getElementById('checkOutsTbody');
+    const checkInsBadge = document.getElementById('checkInsCountBadge');
+    const checkOutsBadge = document.getElementById('checkOutsCountBadge');
+
+    if (checkInsBadge) checkInsBadge.textContent = `${d.totalCheckIns || 0} Guests`;
+    if (checkOutsBadge) checkOutsBadge.textContent = `${d.totalCheckOuts || 0} Guests`;
 
     if (checkInsTbody) {
-      if (d.checkIns.length === 0) {
-        checkInsTbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No check-ins recorded for this date.</td></tr>';
+      if (!d.checkIns || d.checkIns.length === 0) {
+        checkInsTbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">No scheduled check-ins found for check-in date <strong>${inVal}</strong>.</td></tr>`;
       } else {
         checkInsTbody.innerHTML = d.checkIns.map(c => `
           <tr>
@@ -1217,8 +1239,8 @@ async function loadDailyMovements() {
     }
 
     if (checkOutsTbody) {
-      if (d.checkOuts.length === 0) {
-        checkOutsTbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No check-outs recorded for this date.</td></tr>';
+      if (!d.checkOuts || d.checkOuts.length === 0) {
+        checkOutsTbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">No scheduled check-outs found for check-out date <strong>${outVal}</strong>.</td></tr>`;
       } else {
         checkOutsTbody.innerHTML = d.checkOuts.map(c => `
           <tr>
