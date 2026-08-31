@@ -574,7 +574,6 @@ function renderOrdersTable(orders) {
           <div style="display:flex; gap:6px;">
             <button class="btn-table btn-approve" onclick="approveOrder('${o.voucherId}')" title="Approve & Send Voucher"><i class="fa-solid fa-check"></i></button>
             <button class="btn-table btn-cash" onclick="confirmCashPayment('${o.voucherId}')" title="Settle Cash in KSA"><i class="fa-solid fa-money-bill-wave"></i></button>
-            <a href="/vouchers/${o.voucherId}.pdf" target="_blank" class="btn-table btn-view" title="View PDF Voucher"><i class="fa-solid fa-file-pdf"></i></a>
           </div>
         </td>
       </tr>
