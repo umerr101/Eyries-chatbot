@@ -235,11 +235,11 @@ function initEventHandlers() {
     });
   });
 
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      closeActiveModal();
-    }
-  });
+  const dateInput = document.getElementById('movementDateInput');
+  if (dateInput) {
+    dateInput.addEventListener('change', loadDailyMovements);
+    dateInput.addEventListener('input', loadDailyMovements);
+  }
 }
 
 function closeActiveModal() {
@@ -1181,7 +1181,11 @@ function closeHotelModal() {
 async function loadDailyMovements() {
   try {
     const dateInput = document.getElementById('movementDateInput');
-    const dateVal = dateInput ? dateInput.value : '';
+    let dateVal = dateInput ? dateInput.value : '';
+    if (!dateVal) {
+      dateVal = '2026-09-01';
+      if (dateInput) dateInput.value = dateVal;
+    }
     const res = await fetch(`/api/reports/daily-movements?date=${dateVal}`);
     const json = await res.json();
     if (!json.success) return;
@@ -1196,13 +1200,17 @@ async function loadDailyMovements() {
       } else {
         checkInsTbody.innerHTML = d.checkIns.map(c => `
           <tr>
-            <td><strong>${c.voucherId}</strong></td>
-            <td>${c.guestName}</td>
+            <td>
+              <a href="/vouchers/${c.voucherId}.pdf" target="_blank" style="color:var(--accent-cyan); font-weight:700; text-decoration:none;" title="View PDF Voucher">
+                <i class="fa-solid fa-file-pdf" style="color:var(--accent-rose);"></i> ${c.voucherId}
+              </a>
+            </td>
+            <td><strong>${c.guestName}</strong></td>
             <td>${c.hotelName} (${c.city})</td>
             <td>${c.roomType}</td>
-            <td>${c.nights} N</td>
+            <td><strong>${c.nights}</strong> Nights</td>
             <td>${c.pax} Pax</td>
-            <td><span class="badge-status status-approved">Scheduled</span></td>
+            <td><span class="badge-status status-approved">SCHEDULED CHECK-IN</span></td>
           </tr>
         `).join('');
       }
@@ -1214,12 +1222,16 @@ async function loadDailyMovements() {
       } else {
         checkOutsTbody.innerHTML = d.checkOuts.map(c => `
           <tr>
-            <td><strong>${c.voucherId}</strong></td>
-            <td>${c.guestName}</td>
+            <td>
+              <a href="/vouchers/${c.voucherId}.pdf" target="_blank" style="color:var(--accent-cyan); font-weight:700; text-decoration:none;" title="View PDF Voucher">
+                <i class="fa-solid fa-file-pdf" style="color:var(--accent-rose);"></i> ${c.voucherId}
+              </a>
+            </td>
+            <td><strong>${c.guestName}</strong></td>
             <td>${c.hotelName} (${c.city})</td>
             <td>${c.nextDestination}</td>
             <td>${c.pax} Pax</td>
-            <td><span class="badge-status status-pending">Departure</span></td>
+            <td><span class="badge-status status-pending">CHECK-OUT / DEPARTURE</span></td>
           </tr>
         `).join('');
       }

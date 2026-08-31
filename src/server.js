@@ -365,12 +365,104 @@ function initServer(client, app, server) {
     }
   });
 
-  // 9. Daily Movements
-  app.get('/api/reports/movements', (req, res) => {
+function normalizeDateStr(dStr) {
+  if (!dStr) return '';
+  dStr = dStr.trim();
+  const monthNames = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06', jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
+  const m1 = dStr.match(/^([0-9]{1,2})-([A-Za-z]{3})-(?:[0-9]{2})$/);
+  if (m1) {
+    const day = m1[1].padStart(2, '0');
+    const mo = monthNames[m1[2].toLowerCase()] || '01';
+    return `2026-${mo}-${day}`;
+  }
+  const m2 = dStr.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/);
+  if (m2) return `${m2[1]}-${m2[2]}-${m2[3]}`;
+  const m3 = dStr.match(/^([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{4})$/);
+  if (m3) return `${m3[3]}-${m3[2].padStart(2, '0')}-${m3[1].padStart(2, '0')}`;
+  return dStr;
+}
+
+  // 9. Daily Movements Endpoint
+  app.get(['/api/reports/daily-movements', '/api/reports/movements'], (req, res) => {
     try {
-      const dateStr = req.query.date || new Date().toISOString().split('T')[0];
+      const rawDate = req.query.date || '2026-09-01';
+      const targetDate = normalizeDateStr(rawDate);
       const orders = getBookingOrders();
-      return res.json({ success: true, date: dateStr, data: orders });
+
+      const checkIns = [];
+      const checkOuts = [];
+
+      orders.forEach(o => {
+        const s = o.sessionData || {};
+        const guestName = s.familyHeadName || (s.passportData ? `${s.passportData.firstName} ${s.passportData.lastName}` : 'Guest');
+
+        // Check Makkah stay
+        if (s.makkahBooking) {
+          const mkIn = normalizeDateStr(s.makkahBooking.checkIn);
+          const mkOut = normalizeDateStr(s.makkahBooking.checkOut);
+
+          if (mkIn === targetDate) {
+            checkIns.push({
+              voucherId: o.voucherId,
+              guestName,
+              city: 'Makkah',
+              hotelName: s.makkahBooking.hotelName,
+              roomType: s.makkahBooking.roomType || 'Sharing Room',
+              nights: s.makkahBooking.nights || 8,
+              pax: s.passengerCount || 1
+            });
+          }
+          if (mkOut === targetDate) {
+            checkOuts.push({
+              voucherId: o.voucherId,
+              guestName,
+              city: 'Makkah',
+              hotelName: s.makkahBooking.hotelName,
+              nextDestination: s.madinahBooking ? `Transfer to ${s.madinahBooking.hotelName} (Madinah)` : 'Departure / Flight Home',
+              pax: s.passengerCount || 1
+            });
+          }
+        }
+
+        // Check Madinah stay
+        if (s.madinahBooking) {
+          const mdIn = normalizeDateStr(s.madinahBooking.checkIn);
+          const mdOut = normalizeDateStr(s.madinahBooking.checkOut);
+
+          if (mdIn === targetDate) {
+            checkIns.push({
+              voucherId: o.voucherId,
+              guestName,
+              city: 'Madinah',
+              hotelName: s.madinahBooking.hotelName,
+              roomType: s.madinahBooking.roomType || 'Sharing Room',
+              nights: s.madinahBooking.nights || 6,
+              pax: s.passengerCount || 1
+            });
+          }
+          if (mdOut === targetDate) {
+            checkOuts.push({
+              voucherId: o.voucherId,
+              guestName,
+              city: 'Madinah',
+              hotelName: s.madinahBooking.hotelName,
+              nextDestination: 'Departure / Flight Home',
+              pax: s.passengerCount || 1
+            });
+          }
+        }
+      });
+
+      return res.json({
+        success: true,
+        date: targetDate,
+        data: {
+          checkIns,
+          checkOuts,
+          totalCheckIns: checkIns.length,
+          totalCheckOuts: checkOuts.length
+        }
+      });
     } catch (err) {
       return res.status(500).json({ success: false, error: err.message });
     }
