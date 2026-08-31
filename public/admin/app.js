@@ -217,6 +217,36 @@ function initEventHandlers() {
     kpiCards[3].title = 'Click to open Verified Pilgrims Roster popup';
     kpiCards[3].addEventListener('click', () => openKpiModal('pilgrims'));
   }
+
+  // Close buttons & background overlay click listeners
+  document.querySelectorAll('.modal-close-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeActiveModal();
+    });
+  });
+
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        closeActiveModal();
+      }
+    });
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeActiveModal();
+    }
+  });
+}
+
+function closeActiveModal() {
+  document.querySelectorAll('.modal-overlay').forEach(modal => {
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+  });
 }
 
 function openKpiModal(type) {
@@ -226,6 +256,9 @@ function openKpiModal(type) {
   const icon = document.getElementById('kpiModalIcon');
   const body = document.getElementById('kpiModalBody');
   if (!modal || !body) return;
+
+  modal.style.display = 'flex';
+  modal.classList.add('active');
 
   const orders = allOrdersData || [];
 
@@ -1137,11 +1170,11 @@ function openHotelModal(hotelName) {
   `;
 
   modal.style.display = 'flex';
+  modal.classList.add('active');
 }
 
 function closeHotelModal() {
-  const modal = document.getElementById('hotelDetailModal');
-  if (modal) modal.style.display = 'none';
+  closeActiveModal();
 }
 
 // ── 8. Daily Movements ───────────────────────────────────────

@@ -42,6 +42,8 @@ function syncPassportsDbOrders(ordersObj) {
               finalVisaRate: sarAmount,
               totalSar: sarAmount,
               totalPkr: pkrAmount,
+              makkahBooking: rec.makkahBooking || null,
+              madinahBooking: rec.madinahBooking || null,
               paymentType: 'BANK_DEPOSIT',
               passportData: {
                 firstName: rec.firstName,

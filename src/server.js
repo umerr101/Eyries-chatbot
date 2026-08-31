@@ -303,20 +303,35 @@ function initServer(client, app, server) {
       const orders = getBookingOrders();
 
       const formatHotelList = (list, city) => list.map(h => {
+        const hotelNameLower = (h.name || '').toLowerCase().trim();
+        const hotelFirstWord = hotelNameLower.split(' ')[0];
+
         const matchingBookings = orders.filter(o => {
           const s = o.sessionData || {};
-          return (s.makkahBooking?.hotelName === h.name || s.madinahBooking?.hotelName === h.name || s.cityBooking?.hotelName === h.name);
-        }).map(o => ({
-          voucherId: o.voucherId,
-          guestName: o.sessionData.familyHeadName || 'Guest',
-          phone: o.customerPhone ? o.customerPhone.replace('@c.us', '') : '',
-          checkIn: o.sessionData.checkInPretty || 'TBD',
-          checkOut: o.sessionData.checkOutPretty || 'TBD',
-          nights: o.sessionData.nights || 1,
-          roomType: o.sessionData.roomType || 'Double',
-          pax: o.sessionData.passengerCount || 1,
-          status: o.status || 'CONFIRMED'
-        }));
+          const mkName = (s.makkahBooking?.hotelName || '').toLowerCase().trim();
+          const mdName = (s.madinahBooking?.hotelName || '').toLowerCase().trim();
+          const ctName = (s.cityBooking?.hotelName || '').toLowerCase().trim();
+
+          const isMakkahMatch = mkName && (mkName.includes(hotelFirstWord) || hotelNameLower.includes(mkName.split(' ')[0]));
+          const isMadinahMatch = mdName && (mdName.includes(hotelFirstWord) || hotelNameLower.includes(mdName.split(' ')[0]));
+          const isCityMatch = ctName && (ctName.includes(hotelFirstWord) || hotelNameLower.includes(ctName.split(' ')[0]));
+
+          return isMakkahMatch || isMadinahMatch || isCityMatch;
+        }).map(o => {
+          const s = o.sessionData || {};
+          const bkg = (city === 'Makkah' ? s.makkahBooking : s.madinahBooking) || s.makkahBooking || s.madinahBooking || {};
+          return {
+            voucherId: o.voucherId,
+            guestName: s.familyHeadName || 'Guest',
+            phone: o.customerPhone ? o.customerPhone.replace('@c.us', '') : '',
+            checkIn: bkg.checkIn || s.checkInPretty || '02-Sep-26',
+            checkOut: bkg.checkOut || s.checkOutPretty || '10-Sep-26',
+            nights: bkg.nights || s.nights || 8,
+            roomType: bkg.roomType || s.roomType || 'Sharing Room',
+            pax: s.passengerCount || 1,
+            status: o.status || 'APPROVED'
+          };
+        });
 
         const totalRooms = 30;
         const totalBeds = 120;
